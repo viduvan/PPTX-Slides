@@ -71,6 +71,7 @@ const dom = {
 
 // ── Initialization ─────────────────────────────────────────
 function init() {
+    initI18n();
     setupUpload();
     setupGenerate();
     setupEdit();
@@ -118,11 +119,11 @@ function setupUpload() {
 async function uploadFile(file) {
     const ext = file.name.split('.').pop().toLowerCase();
     if (!['docx', 'pdf'].includes(ext)) {
-        showToast('Only .docx and .pdf files are supported', 'error');
+        showToast(t('toast.file.invalid'), 'error');
         return;
     }
 
-    setStatus('Uploading...', 'loading');
+    setStatus(t('status.uploading'), 'loading');
     dom.fileName.textContent = file.name;
 
     const formData = new FormData();
@@ -144,15 +145,15 @@ async function uploadFile(file) {
 
         dom.uploadZone.hidden = true;
         dom.uploadStatus.hidden = false;
-        dom.uploadInfo.textContent = `${data.word_count} words${data.was_summarized ? ' (summarized)' : ''}`;
+        dom.uploadInfo.textContent = `${data.word_count} ${t('upload.words')}${data.was_summarized ? ' ' + t('upload.summarized') : ''}`;
 
-        setStatus('Ready', 'ready');
-        showToast(`Document uploaded: ${file.name}`, 'success');
+        setStatus(t('status.ready'), 'ready');
+        showToast(`${t('toast.upload.success')} ${file.name}`, 'success');
 
     } catch (err) {
-        setStatus('Upload failed', 'error');
-        showToast(`Upload error: ${err.message}`, 'error');
-        setTimeout(() => setStatus('Ready', 'ready'), 3000);
+        setStatus(t('status.upload.failed'), 'error');
+        showToast(`${t('toast.upload.error')} ${err.message}`, 'error');
+        setTimeout(() => setStatus(t('status.ready'), 'ready'), 3000);
     }
 }
 
@@ -172,12 +173,12 @@ function setupGenerate() {
 async function generateSlides() {
     const prompt = dom.promptInput.value.trim();
     if (!prompt) {
-        showToast('Please enter a prompt first', 'error');
+        showToast(t('toast.prompt.empty'), 'error');
         dom.promptInput.focus();
         return;
     }
 
-    showLoading('Generating slides with AI...');
+    showLoading(t('loading.generating'));
 
     try {
         const res = await fetch(`${API_BASE}/api/slides/generate`, {
@@ -201,14 +202,14 @@ async function generateSlides() {
 
         renderSlides();
         hideLoading();
-        setStatus('Ready', 'ready');
+        setStatus(t('status.ready'), 'ready');
         showToast(data.message, 'success');
 
     } catch (err) {
         hideLoading();
-        setStatus('Error', 'error');
-        showToast(`Error: ${err.message}`, 'error');
-        setTimeout(() => setStatus('Ready', 'ready'), 3000);
+        setStatus(t('status.error'), 'error');
+        showToast(`${t('toast.gen.error')} ${err.message}`, 'error');
+        setTimeout(() => setStatus(t('status.ready'), 'ready'), 3000);
     }
 }
 
@@ -230,16 +231,16 @@ function setupEdit() {
 async function editSlides() {
     const prompt = dom.editInput.value.trim();
     if (!prompt) {
-        showToast('Please describe what to change', 'error');
+        showToast(t('toast.edit.empty'), 'error');
         dom.editInput.focus();
         return;
     }
     if (!state.sessionId) {
-        showToast('No active session. Generate slides first.', 'error');
+        showToast(t('toast.edit.no.session'), 'error');
         return;
     }
 
-    showLoading('Editing slides with AI...');
+    showLoading(t('loading.editing'));
 
     try {
         const res = await fetch(`${API_BASE}/api/slides/edit`, {
@@ -262,21 +263,21 @@ async function editSlides() {
         dom.editInput.value = '';
         renderSlides();
         hideLoading();
-        setStatus('Ready', 'ready');
+        setStatus(t('status.ready'), 'ready');
         showToast(data.message, 'success');
 
     } catch (err) {
         hideLoading();
-        setStatus('Error', 'error');
-        showToast(`Error: ${err.message}`, 'error');
-        setTimeout(() => setStatus('Ready', 'ready'), 3000);
+        setStatus(t('status.error'), 'error');
+        showToast(`${t('toast.edit.error')} ${err.message}`, 'error');
+        setTimeout(() => setStatus(t('status.ready'), 'ready'), 3000);
     }
 }
 
 async function undoSlides() {
     if (!state.sessionId) return;
 
-    setStatus('Undoing...', 'loading');
+    setStatus(t('status.undoing'), 'loading');
 
     try {
         const res = await fetch(`${API_BASE}/api/slides/${state.sessionId}/undo`, {
@@ -292,20 +293,20 @@ async function undoSlides() {
         state.slides = data.slides;
 
         renderSlides();
-        setStatus('Ready', 'ready');
-        showToast('Reverted to previous version', 'info');
+        setStatus(t('status.ready'), 'ready');
+        showToast(t('toast.undo.success'), 'info');
 
     } catch (err) {
-        setStatus('Error', 'error');
-        showToast(`Error: ${err.message}`, 'error');
-        setTimeout(() => setStatus('Ready', 'ready'), 3000);
+        setStatus(t('status.error'), 'error');
+        showToast(`${t('toast.undo.error')} ${err.message}`, 'error');
+        setTimeout(() => setStatus(t('status.ready'), 'ready'), 3000);
     }
 }
 
 async function downloadSlides() {
     if (!state.sessionId) return;
 
-    setStatus('Preparing download...', 'loading');
+    setStatus(t('status.downloading'), 'loading');
 
     try {
         const res = await fetch(`${API_BASE}/api/slides/${state.sessionId}/download`);
@@ -325,13 +326,13 @@ async function downloadSlides() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        setStatus('Ready', 'ready');
-        showToast('Presentation downloaded!', 'success');
+        setStatus(t('status.ready'), 'ready');
+        showToast(t('toast.download.success'), 'success');
 
     } catch (err) {
-        setStatus('Error', 'error');
-        showToast(`Download error: ${err.message}`, 'error');
-        setTimeout(() => setStatus('Ready', 'ready'), 3000);
+        setStatus(t('status.error'), 'error');
+        showToast(`${t('toast.download.error')} ${err.message}`, 'error');
+        setTimeout(() => setStatus(t('status.ready'), 'ready'), 3000);
     }
 }
 
@@ -351,9 +352,9 @@ function renderSlides() {
 
         card.innerHTML = `
             <div class="slide-card__header">
-                <span class="slide-card__number">Slide ${slide.slide_number}</span>
+                <span class="slide-card__number">${t('slide.label')} ${slide.slide_number}</span>
                 <div class="slide-card__actions">
-                    <button class="btn-icon" title="View details">
+                    <button class="btn-icon" title="${t('slide.view')}">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                             <circle cx="12" cy="12" r="3"/>
@@ -381,9 +382,9 @@ function setupModal() {
 }
 
 function openSlideModal(slide) {
-    dom.modalTitle.textContent = `Slide ${slide.slide_number}`;
-    dom.modalSlideTitle.textContent = slide.title || '(No title)';
-    dom.modalSlideContent.textContent = slide.content || '(No content)';
+    dom.modalTitle.textContent = `${t('slide.label')} ${slide.slide_number}`;
+    dom.modalSlideTitle.textContent = slide.title || t('modal.no.title');
+    dom.modalSlideContent.textContent = slide.content || t('modal.no.content');
 
     if (slide.narration && slide.narration.trim()) {
         dom.modalNarrationField.hidden = false;

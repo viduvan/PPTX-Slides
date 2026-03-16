@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=4">
+    <link rel="stylesheet" href="/static/style.css?v=5">
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 </head>
 
@@ -21,11 +21,18 @@
             <svg class="topnav__logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
             </svg>
-            <span class="topnav__title">PPTX-Slides (VietPV)</span>
+            <span class="topnav__title" data-i18n="nav.title">PPTX-Slides (VietPV)</span>
         </div>
-        <div class="topnav__status" id="statusBadge">
-            <span class="status-dot"></span>
-            <span id="statusText">Ready</span>
+        <div class="topnav__right">
+            <!-- Language Switcher -->
+            <div class="lang-switcher">
+                <button class="lang-switcher__btn active" data-lang="en">EN</button>
+                <button class="lang-switcher__btn" data-lang="vi">VI</button>
+            </div>
+            <div class="topnav__status" id="statusBadge">
+                <span class="status-dot"></span>
+                <span id="statusText" data-i18n="status.ready">Ready</span>
+            </div>
         </div>
     </nav>
 
@@ -40,7 +47,7 @@
                         <polyline points="17 8 12 3 7 8" />
                         <line x1="12" y1="3" x2="12" y2="15" />
                     </svg>
-                    Upload Document
+                    <span data-i18n="sidebar.upload">Upload Document</span>
                 </h3>
                 <div class="upload-zone" id="uploadZone">
                     <input type="file" id="fileInput" accept=".docx,.pdf" hidden>
@@ -50,8 +57,8 @@
                         <polyline points="17 8 12 3 7 8" />
                         <line x1="12" y1="3" x2="12" y2="15" />
                     </svg>
-                    <p class="upload-zone__text">Drag & drop <strong>.docx</strong> or <strong>.pdf</strong> here</p>
-                    <p class="upload-zone__hint">or click to browse</p>
+                    <p class="upload-zone__text"><span data-i18n="upload.dragdrop">Drag & drop</span> <strong>.docx</strong> <span data-i18n="upload.dragdrop.filetypes">or .pdf here</span></p>
+                    <p class="upload-zone__hint" data-i18n="upload.hint">or click to browse</p>
                 </div>
                 <div class="upload-status" id="uploadStatus" hidden>
                     <div class="upload-status__file">
@@ -61,7 +68,7 @@
                             <polyline points="14 2 14 8 20 8" />
                         </svg>
                         <span id="fileName">document.docx</span>
-                        <button class="btn-icon" id="removeFile" title="Remove file">×</button>
+                        <button class="btn-icon" id="removeFile" data-i18n-title="upload.remove.title" title="Remove file">×</button>
                     </div>
                     <p class="upload-status__info" id="uploadInfo"></p>
                 </div>
@@ -73,9 +80,10 @@
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                     </svg>
-                    Prompt
+                    <span data-i18n="sidebar.prompt">Prompt</span>
                 </h3>
                 <textarea class="prompt-input" id="promptInput"
+                    data-i18n-placeholder="placeholder.prompt"
                     placeholder="Describe your presentation...&#10;&#10;E.g.: Create 5 slides about the future of AI in healthcare, including an intro, key technologies, challenges, case studies, and conclusion."></textarea>
             </div>
 
@@ -90,15 +98,15 @@
                         <path
                             d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
                     </svg>
-                    Theme
+                    <span data-i18n="sidebar.theme">Theme</span>
                 </h3>
                 <div class="theme-selector" id="themeSelector">
                     <!-- Auto option always present -->
                     <button class="theme-option theme-option--auto active" data-theme="auto"
-                        title="Auto — detect from content">
+                        data-i18n-title="theme.auto.title" title="Auto — detect from content">
                         <span class="theme-option__color"
                             style="background: linear-gradient(135deg, #7c5cfc, #5b8def);">✨</span>
-                        <span class="theme-option__label">Auto</span>
+                        <span class="theme-option__label" data-i18n="theme.auto">Auto</span>
                     </button>
                     <!-- Dynamically loaded themes will be inserted here -->
                 </div>
@@ -110,7 +118,7 @@
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                     </svg>
-                    Generate Slides
+                    <span data-i18n="btn.generate">Generate Slides</span>
                 </button>
             </div>
         </aside>
@@ -126,22 +134,21 @@
                         <line x1="12" y1="17" x2="12" y2="21" />
                     </svg>
                 </div>
-                <h2 class="empty-state__title">Create Your Presentation</h2>
-                <p class="empty-state__desc">Upload a document or write a prompt to get started.<br>AI will generate
-                    beautiful slides for you.</p>
+                <h2 class="empty-state__title" data-i18n="empty.title">Create Your Presentation</h2>
+                <p class="empty-state__desc"><span data-i18n="empty.desc">Upload a document or write a prompt to get started.</span><br><span data-i18n="empty.desc2">AI will generate beautiful slides for you.</span></p>
             </div>
 
             <!-- Loading State -->
             <div class="loading-state" id="loadingState" hidden>
                 <div class="loading-spinner"></div>
-                <p class="loading-state__text" id="loadingText">Generating slides with AI...</p>
+                <p class="loading-state__text" id="loadingText" data-i18n="loading.generating">Generating slides with AI...</p>
             </div>
 
             <!-- Slide Preview Area -->
             <div class="slides-area" id="slidesArea" hidden>
                 <div class="slides-header">
                     <h2 class="slides-header__title">
-                        <span id="slideCount">0</span> Slides
+                        <span id="slideCount">0</span> <span data-i18n="slides.count.suffix">Slides</span>
                     </h2>
                     <div class="slides-header__actions">
                         <button class="btn btn--ghost" id="undoBtn" title="Undo last edit">
@@ -150,7 +157,7 @@
                                 <polyline points="1 4 1 10 7 10" />
                                 <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
                             </svg>
-                            Undo
+                            <span data-i18n="btn.undo">Undo</span>
                         </button>
                         <button class="btn btn--accent" id="downloadBtn">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -159,7 +166,7 @@
                                 <polyline points="7 10 12 15 17 10" />
                                 <line x1="12" y1="15" x2="12" y2="3" />
                             </svg>
-                            Download PPTX
+                            <span data-i18n="btn.download">Download PPTX</span>
                         </button>
                     </div>
                 </div>
@@ -171,6 +178,7 @@
                 <div class="edit-panel">
                     <div class="edit-panel__inner">
                         <textarea class="edit-input" id="editInput"
+                            data-i18n-placeholder="placeholder.edit"
                             placeholder="Describe what you want to change... E.g.: Add more details to slide 3, remove slide 5, add a new slide about market trends after slide 2"></textarea>
                         <button class="btn btn--primary" id="editBtn">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -178,7 +186,7 @@
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                             </svg>
-                            Edit Slides
+                            <span data-i18n="btn.edit">Edit Slides</span>
                         </button>
                     </div>
                 </div>
@@ -195,15 +203,15 @@
             </div>
             <div class="modal__body">
                 <div class="modal__field">
-                    <label>Title</label>
+                    <label data-i18n="modal.label.title">Title</label>
                     <div class="modal__content" id="modalSlideTitle"></div>
                 </div>
                 <div class="modal__field">
-                    <label>Content</label>
+                    <label data-i18n="modal.label.content">Content</label>
                     <div class="modal__content modal__content--large" id="modalSlideContent"></div>
                 </div>
                 <div class="modal__field" id="modalNarrationField">
-                    <label>Narration / Notes</label>
+                    <label data-i18n="modal.label.narration">Narration / Notes</label>
                     <div class="modal__content" id="modalSlideNarration"></div>
                 </div>
             </div>
@@ -213,7 +221,8 @@
     <!-- ═══ Toast Notifications ═══ -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <script src="/static/app.js?v=4"></script>
+    <script src="/static/i18n.js?v=1"></script>
+    <script src="/static/app.js?v=5"></script>
 </body>
 
 </html>
