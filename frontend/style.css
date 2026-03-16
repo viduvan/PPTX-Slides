@@ -256,10 +256,84 @@ body {
 
 /* ── Theme Selector ────────────────────────────────────── */
 .theme-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+/* Category Tabs */
+.theme-tabs {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.theme-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.theme-tab {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    background: var(--bg-glass);
+    color: var(--text-muted);
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.theme-tab:hover {
+    border-color: var(--border-medium);
+    color: var(--text-secondary);
+    background: var(--bg-glass-hover);
+}
+
+.theme-tab.active {
+    border-color: var(--accent-primary);
+    color: var(--text-primary);
+    background: rgba(124, 92, 252, 0.12);
+    box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.theme-tab__label {
+    display: none;
+}
+
+@media (min-width: 400px) {
+    .theme-tab__label {
+        display: inline;
+    }
+}
+
+/* Category theme grids */
+.theme-tabs__content {
+    min-height: 0;
+}
+
+.theme-category {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 6px;
-    margin-top: 4px;
+}
+
+/* Auto option — full-width bar */
+.theme-option--auto {
+    flex-direction: row;
+    width: 100%;
+    padding: 8px 12px;
+    gap: 8px;
 }
 
 .theme-option {

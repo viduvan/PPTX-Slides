@@ -471,17 +471,52 @@ async function loadThemes() {
         const data = await res.json();
         const container = dom.themeSelector;
 
-        data.themes.forEach(theme => {
-            const btn = document.createElement('button');
-            btn.className = 'theme-option';
-            btn.dataset.theme = theme.id;
-            btn.title = theme.label;
-            btn.innerHTML = `
-                <span class="theme-option__color" style="background: linear-gradient(135deg, ${theme.accent}, ${theme.bg});">${theme.emoji}</span>
-                <span class="theme-option__label">${theme.label}</span>
-            `;
-            container.appendChild(btn);
+        // Build category tabs
+        const tabBar = document.createElement('div');
+        tabBar.className = 'theme-tabs';
+
+        const tabContent = document.createElement('div');
+        tabContent.className = 'theme-tabs__content';
+
+        data.categories.forEach((cat, idx) => {
+            // Tab button
+            const tab = document.createElement('button');
+            tab.className = 'theme-tab' + (idx === 0 ? ' active' : '');
+            tab.dataset.category = cat.id;
+            const label = currentLang === 'vi' ? (cat.label_vi || cat.label) : cat.label;
+            tab.innerHTML = `<span>${cat.emoji}</span> <span class="theme-tab__label">${label}</span>`;
+            tab.addEventListener('click', () => {
+                tabBar.querySelectorAll('.theme-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                tabContent.querySelectorAll('.theme-category').forEach(p => p.hidden = true);
+                tabContent.querySelector(`[data-cat="${cat.id}"]`).hidden = false;
+            });
+            tabBar.appendChild(tab);
+
+            // Theme grid for this category
+            const panel = document.createElement('div');
+            panel.className = 'theme-category';
+            panel.dataset.cat = cat.id;
+            panel.hidden = idx !== 0;
+
+            cat.themes.forEach(theme => {
+                const btn = document.createElement('button');
+                btn.className = 'theme-option';
+                btn.dataset.theme = theme.id;
+                const themeLabel = currentLang === 'vi' ? (theme.label_vi || theme.label) : theme.label;
+                btn.title = themeLabel;
+                btn.innerHTML = `
+                    <span class="theme-option__color" style="background: linear-gradient(135deg, ${theme.accent}, ${theme.bg});">${theme.emoji}</span>
+                    <span class="theme-option__label">${themeLabel}</span>
+                `;
+                panel.appendChild(btn);
+            });
+
+            tabContent.appendChild(panel);
         });
+
+        container.appendChild(tabBar);
+        container.appendChild(tabContent);
 
         // Click handlers for all theme buttons
         container.addEventListener('click', (e) => {
@@ -497,7 +532,7 @@ async function loadThemes() {
 
 function selectTheme(themeId) {
     state.selectedTheme = themeId;
-    // Update active state
+    // Update active state across all categories
     dom.themeSelector.querySelectorAll('.theme-option').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.theme === themeId);
     });

@@ -15,6 +15,7 @@ const translations = {
         'sidebar.upload': 'Upload Document',
         'sidebar.prompt': 'Prompt',
         'sidebar.theme': 'Theme',
+        'theme.category.all': 'All',
 
         // ── Upload zone ──
         'upload.dragdrop': 'Drag & drop',
@@ -90,6 +91,7 @@ const translations = {
         'sidebar.upload': 'Tải tài liệu',
         'sidebar.prompt': 'Yêu cầu',
         'sidebar.theme': 'Giao diện',
+        'theme.category.all': 'Tất cả',
 
         // ── Upload zone ──
         'upload.dragdrop': 'Kéo & thả',

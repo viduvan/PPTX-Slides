@@ -17,41 +17,40 @@ from ..models.schemas import (
     UndoRequest,
 )
 from ..services import llm_service, slide_service
-from ..services.template_builder import THEMES, AVAILABLE_THEMES
+from ..services.template_builder import THEMES, AVAILABLE_THEMES, THEME_REGISTRY, THEME_CATEGORIES
 from ..core.session_manager import session_manager
 
 logger = logging.getLogger("odin_api.routers.slides")
 router = APIRouter(prefix="/api/slides", tags=["Slides"])
 
 
-# Theme display names and emoji
-THEME_META = {
-    "dark_purple": {"label": "Dark Purple", "emoji": "🔮"},
-    "ocean":       {"label": "Ocean Blue", "emoji": "🌊"},
-    "forest":      {"label": "Forest Green", "emoji": "🌿"},
-    "sunset":      {"label": "Sunset Orange", "emoji": "🌅"},
-    "midnight":    {"label": "Midnight Blue", "emoji": "🌃"},
-    "crimson":     {"label": "Crimson Red", "emoji": "❤️"},
-    "emerald_gold": {"label": "Emerald Gold", "emoji": "💰"},
-    "rose":        {"label": "Rose Pink", "emoji": "🌸"},
-}
-
-
 @router.get("/themes")
 async def list_themes():
-    """Return all available theme presets."""
-    themes = []
-    for key in AVAILABLE_THEMES:
-        meta = THEME_META.get(key, {"label": key.replace('_', ' ').title(), "emoji": "🎨"})
-        colors = THEMES[key]
-        themes.append({
-            "id": key,
-            "label": meta["label"],
-            "emoji": meta["emoji"],
-            "accent": "#{:02x}{:02x}{:02x}".format(*colors["accent"]),
-            "bg": "#{:02x}{:02x}{:02x}".format(*colors["bg_gradient"]),
+    """Return all available theme presets grouped by category."""
+    categories = []
+    for cat_id, cat_info in sorted(THEME_CATEGORIES.items(), key=lambda x: x[1]["order"]):
+        cat_themes = []
+        for theme_id in AVAILABLE_THEMES:
+            reg = THEME_REGISTRY.get(theme_id)
+            if not reg or reg["category"] != cat_id:
+                continue
+            colors = THEMES[theme_id]
+            cat_themes.append({
+                "id": theme_id,
+                "label": reg["label"],
+                "label_vi": reg.get("label_vi", reg["label"]),
+                "emoji": reg["emoji"],
+                "accent": "#{:02x}{:02x}{:02x}".format(*colors["accent"]),
+                "bg": "#{:02x}{:02x}{:02x}".format(*colors["bg_gradient"]),
+            })
+        categories.append({
+            "id": cat_id,
+            "label": cat_info["label"],
+            "label_vi": cat_info.get("label_vi", cat_info["label"]),
+            "emoji": cat_info["emoji"],
+            "themes": cat_themes,
         })
-    return {"themes": themes, "default": "auto"}
+    return {"categories": categories, "default": "auto"}
 
 
 @router.post("/generate", response_model=GenerateResponse)
