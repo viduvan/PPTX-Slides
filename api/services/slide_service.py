@@ -70,16 +70,17 @@ async def create_pptx(
     theme_name: str | None = None,
 ) -> Path:
     """
-    Create a themed PPTX file from slide data with images.
+    Create a themed PPTX file from slide data.
 
-    Uses template_builder for professional gradient theme and
-    image_service for relevant stock photos.
+    Strategy:
+    1. Try to use a downloaded .pptx template via template_loader
+    2. Fallback to code-generated themed builder if template not found
 
     Args:
         slides: List of slide dicts with keys: slide_number, title, content, narration, image_keyword.
-        template_path: Ignored (kept for backward compatibility). Uses themed builder.
+        template_path: Ignored (kept for backward compatibility).
         output_path: Where to save. Uses temp file if None.
-        theme_name: Theme preset name (e.g. 'ocean', 'forest', 'sunset').
+        theme_name: Theme preset name (e.g. 'corporate_blue', 'neon_pop').
 
     Returns:
         Path to the created PPTX file.
@@ -90,9 +91,12 @@ async def create_pptx(
     # Fetch images for all slides (graceful: returns {} if no API key)
     image_paths = await fetch_images_for_slides(slides)
 
-    # Build themed presentation
-    prs = build_themed_presentation(slides_data=slides, image_paths=image_paths,
-                                    theme_name=theme_name)
+    # Build themed presentation (code-generated with gradient palettes)
+    prs = build_themed_presentation(
+        slides_data=slides,
+        image_paths=image_paths,
+        theme_name=theme_name,
+    )
 
     # Determine output path
     if output_path is None:
@@ -100,7 +104,7 @@ async def create_pptx(
     output_path = Path(output_path)
 
     prs.save(str(output_path))
-    logger.info(f"Themed presentation saved to {output_path} ({len(slides)} slides)")
+    logger.info(f"Presentation saved to {output_path} ({len(slides)} slides)")
     return output_path
 
 
