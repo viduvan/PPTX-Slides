@@ -31,6 +31,8 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: setup and teardown."""
+    import asyncio
+
     # Startup
     logger.info("PPTX-Slides API starting up...")
     logger.info(f"Temp directory: {settings.TEMP_DIR}")
@@ -40,6 +42,13 @@ async def lifespan(app: FastAPI):
 
     if not settings.GEMINI_API_KEY:
         logger.warning("GEMINI_API_KEY is not set! API calls will fail.")
+
+    # Pre-load templates in background (non-blocking)
+    async def _preload():
+        from .services.template_loader import preload_all_templates
+        await asyncio.to_thread(preload_all_templates)
+
+    asyncio.create_task(_preload())
 
     yield
 

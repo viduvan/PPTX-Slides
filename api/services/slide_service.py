@@ -85,18 +85,35 @@ async def create_pptx(
     Returns:
         Path to the created PPTX file.
     """
+    from .template_loader import build_from_template
     from .template_builder import build_themed_presentation
     from .image_service import fetch_images_for_slides
 
     # Fetch images for all slides (graceful: returns {} if no API key)
     image_paths = await fetch_images_for_slides(slides)
 
-    # Build themed presentation (code-generated with gradient palettes)
-    prs = build_themed_presentation(
-        slides_data=slides,
-        image_paths=image_paths,
-        theme_name=theme_name,
-    )
+    # Strategy 1: Try .pptx template file from templates/ folder
+    prs = None
+    if theme_name and theme_name != "auto":
+        try:
+            prs = build_from_template(
+                theme_id=theme_name,
+                slides_data=slides,
+                image_paths=image_paths,
+            )
+            if prs:
+                logger.info(f"Using template file for theme: {theme_name}")
+        except Exception as e:
+            logger.error(f"Template loading failed for '{theme_name}': {e}", exc_info=True)
+            prs = None
+
+    # Strategy 2: Fallback to code-generated
+    if prs is None:
+        prs = build_themed_presentation(
+            slides_data=slides,
+            image_paths=image_paths,
+            theme_name=theme_name,
+        )
 
     # Determine output path
     if output_path is None:

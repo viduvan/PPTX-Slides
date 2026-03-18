@@ -26,9 +26,7 @@ THEME_CATEGORIES = {
     "business":    {"label": "Business",    "label_vi": "Doanh nghiệp",    "emoji": "🏢", "order": 1},
     "creative":    {"label": "Creative",    "label_vi": "Sáng tạo",        "emoji": "🎨", "order": 2},
     "education":   {"label": "Education",   "label_vi": "Giáo dục",        "emoji": "📚", "order": 3},
-    "dark":        {"label": "Dark Premium","label_vi": "Tối cao cấp",     "emoji": "🌙", "order": 4},
-    "minimalist":  {"label": "Minimalist",  "label_vi": "Tối giản",        "emoji": "🌿", "order": 5},
-    "technology":  {"label": "Technology",  "label_vi": "Công nghệ",       "emoji": "💻", "order": 6},
+    "technology":  {"label": "Technology",  "label_vi": "Công nghệ",       "emoji": "💻", "order": 4},
 }
 
 # ── All 30 Theme Presets ────────────────────────────────────
@@ -189,109 +187,6 @@ THEMES = {
         "muted":         RGBColor(0x90, 0xA0, 0x88),
     },
 
-    # ═══ DARK PREMIUM (5) ═══════════════════════════════════
-    "dark_purple": {
-        "bg_dark":       RGBColor(0x0F, 0x0A, 0x1A),
-        "bg_gradient":   RGBColor(0x1A, 0x0A, 0x2E),
-        "title":         RGBColor(0xFF, 0xFF, 0xFF),
-        "subtitle":      RGBColor(0xC4, 0xB5, 0xFD),
-        "body":          RGBColor(0xE0, 0xE0, 0xE0),
-        "accent":        RGBColor(0x7C, 0x3A, 0xED),
-        "accent_light":  RGBColor(0xA7, 0x8B, 0xFA),
-        "muted":         RGBColor(0x9C, 0xA3, 0xAF),
-    },
-    "midnight_blue": {
-        "bg_dark":       RGBColor(0x0A, 0x0A, 0x14),
-        "bg_gradient":   RGBColor(0x12, 0x12, 0x22),
-        "title":         RGBColor(0xFF, 0xFF, 0xFF),
-        "subtitle":      RGBColor(0x93, 0xC5, 0xFD),
-        "body":          RGBColor(0xD4, 0xDE, 0xEC),
-        "accent":        RGBColor(0x25, 0x63, 0xEB),
-        "accent_light":  RGBColor(0x60, 0xA5, 0xFA),
-        "muted":         RGBColor(0x88, 0x99, 0xAA),
-    },
-    "crimson_red": {
-        "bg_dark":       RGBColor(0x1A, 0x06, 0x08),
-        "bg_gradient":   RGBColor(0x2D, 0x0A, 0x0F),
-        "title":         RGBColor(0xFF, 0xFF, 0xFF),
-        "subtitle":      RGBColor(0xFC, 0xA5, 0xA5),
-        "body":          RGBColor(0xF0, 0xDC, 0xDC),
-        "accent":        RGBColor(0xDC, 0x26, 0x26),
-        "accent_light":  RGBColor(0xF8, 0x71, 0x71),
-        "muted":         RGBColor(0xBB, 0x8C, 0x8C),
-    },
-    "obsidian_gold": {
-        "bg_dark":       RGBColor(0x0C, 0x0C, 0x0C),
-        "bg_gradient":   RGBColor(0x16, 0x14, 0x10),
-        "title":         RGBColor(0xFF, 0xFF, 0xFF),
-        "subtitle":      RGBColor(0xFD, 0xE6, 0x8A),
-        "body":          RGBColor(0xE8, 0xE4, 0xD8),
-        "accent":        RGBColor(0xCA, 0x88, 0x10),
-        "accent_light":  RGBColor(0xFA, 0xCC, 0x15),
-        "muted":         RGBColor(0xA0, 0x9C, 0x88),
-    },
-    "carbon_electric": {
-        "bg_dark":       RGBColor(0x0A, 0x0A, 0x0E),
-        "bg_gradient":   RGBColor(0x14, 0x14, 0x1A),
-        "title":         RGBColor(0xFF, 0xFF, 0xFF),
-        "subtitle":      RGBColor(0x38, 0xBD, 0xF8),
-        "body":          RGBColor(0xD0, 0xE8, 0xF5),
-        "accent":        RGBColor(0x00, 0x6A, 0xFF),
-        "accent_light":  RGBColor(0x38, 0x9C, 0xFF),
-        "muted":         RGBColor(0x80, 0x88, 0x9C),
-    },
-
-    # ═══ MINIMALIST (5) ═════════════════════════════════════
-    "pure_white": {
-        "bg_dark":       RGBColor(0xFA, 0xFA, 0xFC),
-        "bg_gradient":   RGBColor(0xF0, 0xF0, 0xF5),
-        "title":         RGBColor(0x1A, 0x1A, 0x2E),
-        "subtitle":      RGBColor(0x4A, 0x4A, 0x68),
-        "body":          RGBColor(0x33, 0x33, 0x44),
-        "accent":        RGBColor(0x4F, 0x46, 0xE5),
-        "accent_light":  RGBColor(0x6D, 0x63, 0xFF),
-        "muted":         RGBColor(0x9C, 0x9C, 0xA8),
-    },
-    "soft_gray": {
-        "bg_dark":       RGBColor(0xF5, 0xF5, 0xF7),
-        "bg_gradient":   RGBColor(0xE8, 0xE8, 0xED),
-        "title":         RGBColor(0x22, 0x22, 0x30),
-        "subtitle":      RGBColor(0x55, 0x55, 0x70),
-        "body":          RGBColor(0x3A, 0x3A, 0x4E),
-        "accent":        RGBColor(0x64, 0x74, 0x8B),
-        "accent_light":  RGBColor(0x94, 0xA3, 0xB8),
-        "muted":         RGBColor(0xA0, 0xA0, 0xAC),
-    },
-    "nordic_frost": {
-        "bg_dark":       RGBColor(0xF0, 0xF4, 0xF8),
-        "bg_gradient":   RGBColor(0xE2, 0xE8, 0xF0),
-        "title":         RGBColor(0x1E, 0x29, 0x3B),
-        "subtitle":      RGBColor(0x47, 0x55, 0x69),
-        "body":          RGBColor(0x33, 0x40, 0x55),
-        "accent":        RGBColor(0x06, 0x84, 0xA6),
-        "accent_light":  RGBColor(0x0E, 0xA5, 0xC9),
-        "muted":         RGBColor(0x8C, 0x99, 0xA8),
-    },
-    "paper_cream": {
-        "bg_dark":       RGBColor(0xFA, 0xF5, 0xEB),
-        "bg_gradient":   RGBColor(0xF0, 0xE8, 0xD8),
-        "title":         RGBColor(0x2C, 0x1E, 0x12),
-        "subtitle":      RGBColor(0x6B, 0x4C, 0x30),
-        "body":          RGBColor(0x44, 0x33, 0x22),
-        "accent":        RGBColor(0x92, 0x55, 0x1E),
-        "accent_light":  RGBColor(0xB4, 0x70, 0x2E),
-        "muted":         RGBColor(0xA0, 0x90, 0x78),
-    },
-    "mono_black": {
-        "bg_dark":       RGBColor(0xFF, 0xFF, 0xFF),
-        "bg_gradient":   RGBColor(0xF8, 0xF8, 0xF8),
-        "title":         RGBColor(0x0A, 0x0A, 0x0A),
-        "subtitle":      RGBColor(0x44, 0x44, 0x44),
-        "body":          RGBColor(0x2A, 0x2A, 0x2A),
-        "accent":        RGBColor(0x18, 0x18, 0x18),
-        "accent_light":  RGBColor(0x3A, 0x3A, 0x3A),
-        "muted":         RGBColor(0x88, 0x88, 0x88),
-    },
 
     # ═══ TECHNOLOGY (5) ═════════════════════════════════════
     "cyber_punk": {
@@ -366,18 +261,6 @@ THEME_REGISTRY = {
     "library_brown":   {"category": "education",  "label": "Library Brown",   "label_vi": "Nâu thư viện",       "emoji": "📖"},
     "science_teal":    {"category": "education",  "label": "Science Teal",    "label_vi": "Xanh khoa học",      "emoji": "🔬"},
     "chalkboard":      {"category": "education",  "label": "Chalkboard",      "label_vi": "Bảng phấn",          "emoji": "📝"},
-    # Dark Premium
-    "dark_purple":     {"category": "dark",       "label": "Dark Purple",     "label_vi": "Tím đậm",            "emoji": "🔮"},
-    "midnight_blue":   {"category": "dark",       "label": "Midnight Blue",   "label_vi": "Xanh nửa đêm",      "emoji": "🌃"},
-    "crimson_red":     {"category": "dark",       "label": "Crimson Red",     "label_vi": "Đỏ thẫm",           "emoji": "❤️"},
-    "obsidian_gold":   {"category": "dark",       "label": "Obsidian Gold",   "label_vi": "Đen vàng obsidian",  "emoji": "✨"},
-    "carbon_electric": {"category": "dark",       "label": "Carbon Electric", "label_vi": "Carbon điện xanh",   "emoji": "🖤"},
-    # Minimalist
-    "pure_white":      {"category": "minimalist", "label": "Pure White",      "label_vi": "Trắng tinh khiết",   "emoji": "🤍"},
-    "soft_gray":       {"category": "minimalist", "label": "Soft Gray",       "label_vi": "Xám nhẹ nhàng",      "emoji": "🩶"},
-    "nordic_frost":    {"category": "minimalist", "label": "Nordic Frost",    "label_vi": "Bắc Âu sương giá",   "emoji": "❄️"},
-    "paper_cream":     {"category": "minimalist", "label": "Paper Cream",     "label_vi": "Giấy kem",           "emoji": "📄"},
-    "mono_black":      {"category": "minimalist", "label": "Mono Black",      "label_vi": "Đen trắng",          "emoji": "◾"},
     # Technology
     "cyber_punk":      {"category": "technology", "label": "Cyber Punk",      "label_vi": "Cyber Punk",         "emoji": "🤖"},
     "matrix_green":    {"category": "technology", "label": "Matrix Green",    "label_vi": "Xanh Matrix",        "emoji": "💚"},
@@ -387,7 +270,7 @@ THEME_REGISTRY = {
 }
 
 AVAILABLE_THEMES = list(THEMES.keys())
-DEFAULT_THEME = "dark_purple"
+DEFAULT_THEME = "corporate_blue"
 
 # ── Slide Dimensions (16:9) ─────────────────────────────────
 SLIDE_WIDTH = Inches(13.333)
