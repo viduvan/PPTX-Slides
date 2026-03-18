@@ -143,10 +143,15 @@ def _detect_layouts(prs: Presentation) -> dict:
     return best
 
 
+# Minimum height for a shape to be considered a text area (skip accent bars)
+_MIN_TEXT_HEIGHT = Inches(0.5)  # ~0.5 inches
+
+
 def _find_placeholders(slide):
     """
     Find title and body text areas in a slide.
-    Title = higher on slide (smaller Y), Body = lower (larger Y, bigger area).
+    Title = higher on slide (smaller Y), Body = lower (larger Y).
+    Skips tiny shapes (accent bars, decorative rectangles).
     """
     title_ph = None
     body_ph = None
@@ -167,17 +172,24 @@ def _find_placeholders(slide):
     if title_ph and body_ph:
         return title_ph, body_ph
 
-    # --- Tier 2: Find ALL shapes with text frames, sort by Y position ---
+    # --- Tier 2: Find text shapes, filter tiny ones, sort by Y position ---
     text_shapes = []
     for shape in slide.shapes:
-        if shape.has_text_frame and shape != title_ph and shape != body_ph:
-            top = shape.top if shape.top is not None else 0
-            text_shapes.append((top, shape))
+        if not shape.has_text_frame:
+            continue
+        if shape == title_ph or shape == body_ph:
+            continue
+        # Skip tiny shapes (accent bars, decorative elements)
+        h = shape.height if shape.height else 0
+        if h < _MIN_TEXT_HEIGHT:
+            continue
+        top = shape.top if shape.top is not None else 0
+        text_shapes.append((top, shape))
 
-    # Sort by top position (Y) ascending — first = highest = title
+    # Sort by Y ascending — first = highest on slide = title
     text_shapes.sort(key=lambda x: x[0])
 
-    for top, shape in text_shapes:
+    for _top, shape in text_shapes:
         if title_ph is None:
             title_ph = shape
         elif body_ph is None and shape != title_ph:
@@ -354,36 +366,58 @@ def build_from_template(
         # Find text areas
         title_ph, body_ph = _find_placeholders(slide)
 
-        # === Fill TITLE ===
-        if title_ph and title_ph.has_text_frame:
-            _fill_text_frame(title_ph.text_frame, title_text, is_title=True)
-        elif title_text:
-            title_box = slide.shapes.add_textbox(
-                Inches(0.5), Inches(0.3),
-                prs.slide_width - Inches(1.0), Inches(1.2)
-            )
-            _fill_text_frame(title_box.text_frame, title_text, is_title=True)
+        if is_first:
+            # === TITLE SLIDE: centered, large font ===
+            if title_ph and title_ph.has_text_frame:
+                _fill_text_frame(title_ph.text_frame, title_text,
+                                 max_font_size=Pt(36), is_title=True)
+                # Center align
+                for para in title_ph.text_frame.paragraphs:
+                    para.alignment = PP_ALIGN.CENTER
+            elif title_text:
+                title_box = slide.shapes.add_textbox(
+                    Inches(1.0), Inches(2.0),
+                    prs.slide_width - Inches(2.0), Inches(2.0)
+                )
+                _fill_text_frame(title_box.text_frame, title_text,
+                                 max_font_size=Pt(36), is_title=True)
+                for para in title_box.text_frame.paragraphs:
+                    para.alignment = PP_ALIGN.CENTER
 
-        # === Fill BODY ===
-        if body_ph and body_ph.has_text_frame:
-            if is_first:
-                short = content_text.split("\n")[0][:150] if content_text else ""
+            # Subtitle on title slide
+            if body_ph and body_ph.has_text_frame and content_text:
+                short = content_text.split("\n")[0][:150]
                 _fill_text_frame(body_ph.text_frame, short, max_font_size=Pt(18))
-            else:
+                for para in body_ph.text_frame.paragraphs:
+                    para.alignment = PP_ALIGN.CENTER
+            elif content_text:
+                short = content_text.split("\n")[0][:150]
+                sub_box = slide.shapes.add_textbox(
+                    Inches(2.0), Inches(4.2),
+                    prs.slide_width - Inches(4.0), Inches(1.0)
+                )
+                _fill_text_frame(sub_box.text_frame, short, max_font_size=Pt(18))
+                for para in sub_box.text_frame.paragraphs:
+                    para.alignment = PP_ALIGN.CENTER
+        else:
+            # === CONTENT / ENDING SLIDES: title top, body below ===
+            if title_ph and title_ph.has_text_frame:
+                _fill_text_frame(title_ph.text_frame, title_text, is_title=True)
+            elif title_text:
+                title_box = slide.shapes.add_textbox(
+                    Inches(0.8), Inches(0.5),
+                    prs.slide_width - Inches(1.6), Inches(1.0)
+                )
+                _fill_text_frame(title_box.text_frame, title_text, is_title=True)
+
+            if body_ph and body_ph.has_text_frame:
                 _fill_text_frame(body_ph.text_frame, content_text, is_title=False)
-        elif content_text and not is_first:
-            body_box = slide.shapes.add_textbox(
-                Inches(0.5), Inches(1.6),
-                prs.slide_width - Inches(1.0), prs.slide_height - Inches(2.2)
-            )
-            _fill_text_frame(body_box.text_frame, content_text, is_title=False)
-        elif content_text and is_first:
-            short = content_text.split("\n")[0][:150]
-            sub_box = slide.shapes.add_textbox(
-                Inches(1.0), Inches(1.8),
-                prs.slide_width - Inches(2.0), Inches(1.0)
-            )
-            _fill_text_frame(sub_box.text_frame, short, max_font_size=Pt(16))
+            elif content_text:
+                body_box = slide.shapes.add_textbox(
+                    Inches(0.8), Inches(1.7),
+                    prs.slide_width - Inches(1.6), prs.slide_height - Inches(2.5)
+                )
+                _fill_text_frame(body_box.text_frame, content_text, is_title=False)
 
         # Speaker notes
         if narration_text:
