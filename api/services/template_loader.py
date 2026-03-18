@@ -146,10 +146,7 @@ def _detect_layouts(prs: Presentation) -> dict:
 def _find_placeholders(slide):
     """
     Find title and body text areas in a slide.
-    Uses a 3-tier strategy:
-    1. Standard placeholders (idx 0 = title, idx 1 = body)
-    2. Any placeholder with a text frame
-    3. Any shape with a text frame (text boxes, etc.)
+    Title = higher on slide (smaller Y), Body = lower (larger Y, bigger area).
     """
     title_ph = None
     body_ph = None
@@ -170,39 +167,23 @@ def _find_placeholders(slide):
     if title_ph and body_ph:
         return title_ph, body_ph
 
-    # --- Tier 2: Any placeholder with text frame ---
-    try:
-        for shape in slide.placeholders:
-            if not shape.has_text_frame:
-                continue
-            if title_ph is None:
-                title_ph = shape
-            elif body_ph is None and shape != title_ph:
-                body_ph = shape
-    except Exception:
-        pass
-
-    if title_ph and body_ph:
-        return title_ph, body_ph
-
-    # --- Tier 3: Any shape with a text frame (sorted by area, largest = body) ---
+    # --- Tier 2: Find ALL shapes with text frames, sort by Y position ---
     text_shapes = []
     for shape in slide.shapes:
         if shape.has_text_frame and shape != title_ph and shape != body_ph:
-            area = shape.width * shape.height if shape.width and shape.height else 0
-            text_shapes.append((area, shape))
+            top = shape.top if shape.top is not None else 0
+            text_shapes.append((top, shape))
 
-    # Sort by area descending — largest text frame is likely body
-    text_shapes.sort(key=lambda x: x[0], reverse=True)
+    # Sort by top position (Y) ascending — first = highest = title
+    text_shapes.sort(key=lambda x: x[0])
 
-    for area, shape in text_shapes:
+    for top, shape in text_shapes:
         if title_ph is None:
             title_ph = shape
         elif body_ph is None and shape != title_ph:
             body_ph = shape
             break
 
-    logger.debug(f"Found placeholders: title={title_ph is not None}, body={body_ph is not None}")
     return title_ph, body_ph
 
 
@@ -318,20 +299,16 @@ def build_from_template(
     image_paths: dict | None = None,
 ) -> Presentation | None:
     """
-    Build a presentation from a downloaded .pptx template.
+    Build a presentation from a .pptx template with 3 slides:
+      [0] Title slide  [1] Content slide  [2] Ending/ThankYou slide
 
-    Strategy: KEEP the original template slides (each has unique design).
-    - Replace text in existing slides with user content.
-    - If user needs more slides → duplicate from template using their layouts.
-    - If user needs fewer slides → remove extra template slides.
+    Strategy:
+    - Slide 0 (title) → fill with user slide 1 data
+    - Clone slide 1's layout for all middle content slides
+    - Slide 2 (ending) → move to the END, fill with last user slide data
+    - Remove extra template slides
 
-    Args:
-        theme_id: Theme identifier (e.g. 'corporate_blue', 'neon_pop')
-        slides_data: List of dicts with: slide_number, title, content, narration
-        image_paths: Optional dict mapping slide_number -> image file path
-
-    Returns:
-        Presentation object, or None if template not found
+    Returns Presentation object, or None if template not found.
     """
     prs = _open_template(theme_id)
     if prs is None:
@@ -342,39 +319,45 @@ def build_from_template(
 
     num_template_slides = len(prs.slides)
     num_user_slides = len(slides_data)
-    logger.info(f"Template '{theme_id}': {num_template_slides} slides, user wants {num_user_slides}")
+    logger.info(f"Template '{theme_id}': {num_template_slides} template slides, user wants {num_user_slides}")
 
-    # --- Step 1: If user needs MORE slides than template, add extras ---
-    if num_user_slides > num_template_slides and num_template_slides > 0:
-        # Add slides by reusing template slide layouts (cycling)
-        for extra_i in range(num_user_slides - num_template_slides):
-            # Cycle through existing template slides' layouts
-            source_idx = (extra_i + 1) % num_template_slides  # skip cover (idx 0)
-            if source_idx == 0 and num_template_slides > 1:
-                source_idx = 1
-            source_layout = prs.slides[source_idx].slide_layout
-            prs.slides.add_slide(source_layout)
-        logger.info(f"Added {num_user_slides - num_template_slides} extra slides")
+    # Save layouts FROM the actual template slides (not from slide_layouts list!)
+    # This preserves the user's custom backgrounds
+    title_layout = prs.slides[0].slide_layout
+    content_layout = prs.slides[min(1, num_template_slides - 1)].slide_layout
+    ending_layout = prs.slides[-1].slide_layout if num_template_slides >= 3 else content_layout
 
-    # --- Step 2: Replace text in each slide ---
+    logger.info(f"Layouts: title='{title_layout.name}', content='{content_layout.name}', ending='{ending_layout.name}'")
+
+    # --- Clear ALL template slides ---
+    _clear_all_slides(prs)
+
+    # --- Rebuild: create exactly the slides user needs ---
     for i, slide_data in enumerate(slides_data):
-        if i >= len(prs.slides):
-            break
-
-        slide = prs.slides[i]
         title_text = slide_data.get("title", "")
         content_text = slide_data.get("content", "")
         narration_text = slide_data.get("narration", "")
-        is_title_slide = (i == 0)
 
-        # Find text areas in this slide
+        is_first = (i == 0)
+        is_last = (i == num_user_slides - 1) and num_user_slides > 1
+
+        # Choose layout from the ACTUAL template slides
+        if is_first:
+            layout = title_layout
+        elif is_last and num_template_slides >= 3:
+            layout = ending_layout
+        else:
+            layout = content_layout
+
+        slide = prs.slides.add_slide(layout)
+
+        # Find text areas
         title_ph, body_ph = _find_placeholders(slide)
 
         # === Fill TITLE ===
         if title_ph and title_ph.has_text_frame:
             _fill_text_frame(title_ph.text_frame, title_text, is_title=True)
         elif title_text:
-            # Fallback: create textbox
             title_box = slide.shapes.add_textbox(
                 Inches(0.5), Inches(0.3),
                 prs.slide_width - Inches(1.0), Inches(1.2)
@@ -383,19 +366,18 @@ def build_from_template(
 
         # === Fill BODY ===
         if body_ph and body_ph.has_text_frame:
-            if is_title_slide:
+            if is_first:
                 short = content_text.split("\n")[0][:150] if content_text else ""
                 _fill_text_frame(body_ph.text_frame, short, max_font_size=Pt(18))
             else:
                 _fill_text_frame(body_ph.text_frame, content_text, is_title=False)
-        elif content_text and not is_title_slide:
-            # Fallback: create textbox
+        elif content_text and not is_first:
             body_box = slide.shapes.add_textbox(
                 Inches(0.5), Inches(1.6),
                 prs.slide_width - Inches(1.0), prs.slide_height - Inches(2.2)
             )
             _fill_text_frame(body_box.text_frame, content_text, is_title=False)
-        elif content_text and is_title_slide:
+        elif content_text and is_first:
             short = content_text.split("\n")[0][:150]
             sub_box = slide.shapes.add_textbox(
                 Inches(1.0), Inches(1.8),
@@ -410,10 +392,6 @@ def build_from_template(
                 notes_tf.text = narration_text
             except Exception:
                 pass
-
-    # --- Step 3: Remove extra template slides if user needs fewer ---
-    while len(prs.slides) > num_user_slides:
-        _remove_last_slide(prs)
 
     logger.info(f"Built presentation from template '{theme_id}': {len(prs.slides)} slides")
     return prs
