@@ -351,30 +351,18 @@ def build_from_template(
         narration_text = slide_data.get("narration", "")
 
         is_first = (i == 0)
-        is_last = (i == num_user_slides - 1) and num_user_slides > 1
 
-        # Choose layout from the ACTUAL template slides
+        # Choose layout: first slide = title, ALL others = content
         if is_first:
             layout = title_layout
-        elif is_last and num_template_slides >= 3:
-            layout = ending_layout
         else:
             layout = content_layout
 
         slide = prs.slides.add_slide(layout)
 
-        # Find text areas
-        title_ph, body_ph = _find_placeholders(slide)
-
         if is_first:
             # === TITLE SLIDE: centered, large font ===
-            if title_ph and title_ph.has_text_frame:
-                _fill_text_frame(title_ph.text_frame, title_text,
-                                 max_font_size=Pt(36), is_title=True)
-                # Center align
-                for para in title_ph.text_frame.paragraphs:
-                    para.alignment = PP_ALIGN.CENTER
-            elif title_text:
+            if title_text:
                 title_box = slide.shapes.add_textbox(
                     Inches(1.0), Inches(2.0),
                     prs.slide_width - Inches(2.0), Inches(2.0)
@@ -383,14 +371,7 @@ def build_from_template(
                                  max_font_size=Pt(36), is_title=True)
                 for para in title_box.text_frame.paragraphs:
                     para.alignment = PP_ALIGN.CENTER
-
-            # Subtitle on title slide
-            if body_ph and body_ph.has_text_frame and content_text:
-                short = content_text.split("\n")[0][:150]
-                _fill_text_frame(body_ph.text_frame, short, max_font_size=Pt(18))
-                for para in body_ph.text_frame.paragraphs:
-                    para.alignment = PP_ALIGN.CENTER
-            elif content_text:
+            if content_text:
                 short = content_text.split("\n")[0][:150]
                 sub_box = slide.shapes.add_textbox(
                     Inches(2.0), Inches(4.2),
@@ -400,19 +381,14 @@ def build_from_template(
                 for para in sub_box.text_frame.paragraphs:
                     para.alignment = PP_ALIGN.CENTER
         else:
-            # === CONTENT / ENDING SLIDES: title top, body below ===
-            if title_ph and title_ph.has_text_frame:
-                _fill_text_frame(title_ph.text_frame, title_text, is_title=True)
-            elif title_text:
+            # === CONTENT SLIDES: title TOP, body BELOW (fixed positions) ===
+            if title_text:
                 title_box = slide.shapes.add_textbox(
                     Inches(0.8), Inches(0.5),
                     prs.slide_width - Inches(1.6), Inches(1.0)
                 )
                 _fill_text_frame(title_box.text_frame, title_text, is_title=True)
-
-            if body_ph and body_ph.has_text_frame:
-                _fill_text_frame(body_ph.text_frame, content_text, is_title=False)
-            elif content_text:
+            if content_text:
                 body_box = slide.shapes.add_textbox(
                     Inches(0.8), Inches(1.7),
                     prs.slide_width - Inches(1.6), prs.slide_height - Inches(2.5)
@@ -426,6 +402,17 @@ def build_from_template(
                 notes_tf.text = narration_text
             except Exception:
                 pass
+
+    # --- Auto-add Thank You ending slide ---
+    if num_template_slides >= 3:
+        end_slide = prs.slides.add_slide(ending_layout)
+        ty_box = end_slide.shapes.add_textbox(
+            Inches(1.0), Inches(2.5),
+            prs.slide_width - Inches(2.0), Inches(2.0)
+        )
+        _fill_text_frame(ty_box.text_frame, "Thank You!", max_font_size=Pt(36), is_title=True)
+        for para in ty_box.text_frame.paragraphs:
+            para.alignment = PP_ALIGN.CENTER
 
     logger.info(f"Built presentation from template '{theme_id}': {len(prs.slides)} slides")
     return prs
