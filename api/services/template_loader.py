@@ -360,6 +360,11 @@ def build_from_template(
 
         slide = prs.slides.add_slide(layout)
 
+        # Remove inherited placeholder shapes to avoid ghost "Click to add" boxes
+        sp_tree = slide.shapes._spTree
+        for ph in list(slide.placeholders):
+            sp_tree.remove(ph._element)
+
         if is_first:
             # === TITLE SLIDE: centered, large font ===
             if title_text:
@@ -417,8 +422,8 @@ def build_from_template(
                 try:
                     slide.shapes.add_picture(
                         str(img_path),
-                        Inches(8.8), Inches(1.8),
-                        Inches(4.0), Inches(4.5),
+                        Inches(8.2), Inches(1.0),
+                        Inches(4.6), Inches(5.5),
                     )
                     logger.info(f"Added image to slide {slide_num}: {img_path}")
                 except Exception as e:
