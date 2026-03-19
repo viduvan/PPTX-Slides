@@ -13,8 +13,11 @@ from __future__ import annotations
 import copy
 import io
 import logging
+import random
 from pathlib import Path
 from functools import lru_cache
+
+from lxml import etree
 
 from pptx import Presentation
 from pptx.util import Inches, Pt
@@ -28,6 +31,64 @@ from .template_builder import (
 from ..core.config import settings
 
 logger = logging.getLogger("pptx_api.template_loader")
+
+# ── OOXML namespace for transitions ─────────────────────────
+_NSMAP = {"p": "http://schemas.openxmlformats.org/presentationml/2006/main"}
+
+# Pool of transition effects: (tag_name, optional_attributes)
+_TRANSITIONS = [
+    ("fade",       {}),
+    ("fade",       {"thruBlk": "1"}),             # Fade through black
+    ("push",       {"dir": "l"}),                  # Push from right
+    ("push",       {"dir": "d"}),                  # Push from top
+    ("wipe",       {"dir": "d"}),                  # Wipe down
+    ("wipe",       {"dir": "l"}),                  # Wipe left
+    ("wipe",       {"dir": "r"}),                  # Wipe right
+    ("cover",      {"dir": "l"}),                  # Cover from right
+    ("cover",      {"dir": "d"}),                  # Cover from top
+    ("split",      {"orient": "horz", "dir": "out"}),
+    ("split",      {"orient": "vert", "dir": "out"}),
+    ("blinds",     {"dir": "horz"}),
+    ("blinds",     {"dir": "vert"}),
+    ("dissolve",   {}),
+    ("wheel",      {"spokes": "4"}),
+    ("comb",       {"dir": "horz"}),
+    ("comb",       {"dir": "vert"}),
+    ("wedge",      {}),
+    ("randomBar",  {"dir": "horz"}),
+    ("randomBar",  {"dir": "vert"}),
+    ("strips",     {"dir": "ld"}),
+    ("strips",     {"dir": "ru"}),
+    ("checker",    {"dir": "horz"}),
+    ("checker",    {"dir": "vert"}),
+    ("newsflash",  {}),
+    ("plus",       {}),
+    ("diamond",    {}),
+    ("circle",     {}),
+]
+
+
+def _add_random_transition(slide, speed="med"):
+    """
+    Add a random slide transition effect via OOXML.
+    Speed: 'slow', 'med', 'fast'.
+    """
+    tag_name, attrs = random.choice(_TRANSITIONS)
+    ns = _NSMAP["p"]
+
+    # Build <p:transition spd="med" advClick="1">
+    transition_el = etree.SubElement(
+        slide._element, f"{{{ns}}}transition"
+    )
+    transition_el.set("spd", speed)
+    transition_el.set("advClick", "1")
+
+    # Build child element, e.g. <p:fade/> or <p:push dir="l"/>
+    child = etree.SubElement(transition_el, f"{{{ns}}}{tag_name}")
+    for attr_name, attr_value in attrs.items():
+        child.set(attr_name, attr_value)
+
+    logger.debug(f"Transition: {tag_name} {attrs}")
 
 # ── In-memory cache ─────────────────────────────────────────
 # Cache: theme_id -> bytes (raw .pptx file read into memory)
@@ -428,6 +489,9 @@ def build_from_template(
                     logger.info(f"Added image to slide {slide_num}: {img_path}")
                 except Exception as e:
                     logger.warning(f"Failed to add image to slide {slide_num}: {e}")
+
+        # Add random slide transition
+        _add_random_transition(slide)
 
         # Speaker notes
         if narration_text:
