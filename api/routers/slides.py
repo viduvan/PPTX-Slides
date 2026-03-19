@@ -2,6 +2,7 @@
 Slides Router — Endpoints for generating, editing, previewing, and downloading slides.
 Developed by ChimSe (viduvan) - https://github.com/viduvan
 """
+import asyncio
 import logging
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from ..models.schemas import (
 )
 from ..services import llm_service, slide_service
 from ..services.template_builder import THEMES, AVAILABLE_THEMES, THEME_REGISTRY, THEME_CATEGORIES
+from ..services.thumbnail_generator import generate_thumbnails, get_thumbnail_paths
 from ..core.session_manager import session_manager
 
 logger = logging.getLogger("odin_api.routers.slides")
@@ -55,17 +57,25 @@ async def list_themes():
 
 @router.get("/themes/{theme_id}/preview")
 async def preview_theme(theme_id: str):
-    """Return theme colors and sample slides for visual preview."""
+    """Return theme metadata and real slide thumbnail URLs from PPTX files."""
     if theme_id not in THEMES:
         raise HTTPException(status_code=404, detail=f"Theme '{theme_id}' not found")
 
-    colors = THEMES[theme_id]
     reg = THEME_REGISTRY.get(theme_id, {})
     cat_id = reg.get("category", "")
     cat_info = THEME_CATEGORIES.get(cat_id, {})
 
-    def rgb_hex(c):
-        return "#{:02x}{:02x}{:02x}".format(int(c[0]), int(c[1]), int(c[2]))
+    # Generate thumbnails on-demand if not cached
+    thumbs = get_thumbnail_paths(theme_id)
+    if not thumbs:
+        thumbs = await asyncio.to_thread(generate_thumbnails, theme_id)
+
+    slide_urls = []
+    for i, p in enumerate(thumbs, start=1):
+        slide_urls.append({
+            "slide_number": i,
+            "image_url": f"/thumbnails/{p.name}",
+        })
 
     return {
         "theme_id": theme_id,
@@ -74,38 +84,7 @@ async def preview_theme(theme_id: str):
         "emoji": reg.get("emoji", "🎨"),
         "category": cat_info.get("label", cat_id),
         "category_vi": cat_info.get("label_vi", cat_id),
-        "colors": {
-            "bg_dark": rgb_hex(colors["bg_dark"]),
-            "bg_gradient": rgb_hex(colors["bg_gradient"]),
-            "title": rgb_hex(colors["title"]),
-            "subtitle": rgb_hex(colors.get("subtitle", colors["title"])),
-            "body": rgb_hex(colors["body"]),
-            "accent": rgb_hex(colors["accent"]),
-            "accent_light": rgb_hex(colors["accent_light"]),
-            "muted": rgb_hex(colors["muted"]),
-        },
-        "sample_slides": [
-            {
-                "type": "title",
-                "title": "Your Presentation Title",
-                "subtitle": "A compelling subtitle that captures your audience's attention",
-            },
-            {
-                "type": "content",
-                "title": "Key Insights & Analysis",
-                "content": "•  Strategic overview of market trends\n•  Data-driven decision making\n•  Innovation and growth opportunities\n•  Building sustainable competitive advantages",
-            },
-            {
-                "type": "content",
-                "title": "Implementation Roadmap",
-                "content": "•  Phase 1: Research & Discovery\n•  Phase 2: Design & Prototyping\n•  Phase 3: Development & Testing\n•  Phase 4: Launch & Optimization",
-            },
-            {
-                "type": "ending",
-                "title": "Thank You!",
-                "subtitle": "Questions & Discussion",
-            },
-        ],
+        "slides": slide_urls,
     }
 
 

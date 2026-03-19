@@ -81,6 +81,7 @@ const dom = {
 // ── Initialization ─────────────────────────────────────────
 function init() {
     initI18n();
+    setupThemeMode();
     setupUpload();
     setupGenerate();
     setupEdit();
@@ -88,6 +89,39 @@ function init() {
     setupKeyboard();
     setupThemePreview();
     loadThemes();
+}
+
+// ── Dark / Light Mode Toggle ───────────────────────────────
+const THEME_MODE_KEY = 'pptx-theme-mode';
+
+function setupThemeMode() {
+    const saved = localStorage.getItem(THEME_MODE_KEY);
+    if (saved === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+    }
+
+    // Enable transitions after initial paint to prevent flash
+    requestAnimationFrame(() => {
+        document.documentElement.style.setProperty(
+            '--theme-transition', 'background 0.4s ease, color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease'
+        );
+    });
+
+    const toggleBtn = document.getElementById('themeToggle');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', toggleThemeMode);
+    }
+}
+
+function toggleThemeMode() {
+    const isCurrentlyLight = document.documentElement.getAttribute('data-theme') === 'light';
+    if (isCurrentlyLight) {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem(THEME_MODE_KEY, 'dark');
+    } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+        localStorage.setItem(THEME_MODE_KEY, 'light');
+    }
 }
 
 // ── Upload Handling ────────────────────────────────────────
@@ -588,45 +622,23 @@ async function showThemePreview(themeId) {
         dom.previewCategory.textContent =
             `${t('preview.category')}: ${currentLang === 'vi' ? data.category_vi : data.category}`;
 
-        // Render slide mockups
-        const c = data.colors;
+        // Render real slide thumbnails
         dom.previewSlides.innerHTML = '';
 
-        data.sample_slides.forEach((slide, idx) => {
-            const isTitle = slide.type === 'title';
-            const isEnding = slide.type === 'ending';
-            const typeClass = isTitle ? 'preview-slide--title'
-                            : isEnding ? 'preview-slide--ending'
-                            : 'preview-slide--content';
-
-            const labelKey = isTitle ? 'preview.slide.title'
-                           : isEnding ? 'preview.slide.ending'
-                           : 'preview.slide.content';
-
-            let innerHtml = '';
-            if (isTitle || isEnding) {
-                innerHtml = `
-                    <h3 class="preview-slide__title" style="color:${c.title};">${escapeHtml(slide.title)}</h3>
-                    ${slide.subtitle ? `<p class="preview-slide__subtitle" style="color:${c.subtitle};">${escapeHtml(slide.subtitle)}</p>` : ''}
+        if (!data.slides || data.slides.length === 0) {
+            dom.previewSlides.innerHTML = `<p style="color:var(--text-muted); text-align:center; grid-column:1/-1; padding:40px;">${t('preview.heading')} — generating thumbnails, please try again shortly...</p>`;
+        } else {
+            data.slides.forEach((slide, idx) => {
+                const card = document.createElement('div');
+                card.className = 'preview-slide';
+                card.style.animationDelay = `${idx * 100}ms`;
+                card.innerHTML = `
+                    <span class="preview-slide__label">${t('slide.label')} ${slide.slide_number}</span>
+                    <img class="preview-slide__img" src="${slide.image_url}" alt="${t('slide.label')} ${slide.slide_number}" loading="lazy" />
                 `;
-            } else {
-                innerHtml = `
-                    <h3 class="preview-slide__title" style="color:${c.title};">${escapeHtml(slide.title)}</h3>
-                    <p class="preview-slide__body" style="color:${c.body};">${escapeHtml(slide.content || '')}</p>
-                `;
-            }
-
-            const card = document.createElement('div');
-            card.className = `preview-slide ${typeClass}`;
-            card.style.animationDelay = `${idx * 100}ms`;
-            card.innerHTML = `
-                <div class="preview-slide__bg" style="background: linear-gradient(315deg, ${c.bg_dark}, ${c.bg_gradient});"></div>
-                <span class="preview-slide__label" style="color:${c.muted};">${t(labelKey)}</span>
-                <div class="preview-slide__inner">${innerHtml}</div>
-                <div class="preview-slide__accent" style="background: linear-gradient(90deg, ${c.accent}, ${c.accent_light});"></div>
-            `;
-            dom.previewSlides.appendChild(card);
-        });
+                dom.previewSlides.appendChild(card);
+            });
+        }
 
         // Show preview, hide others
         dom.emptyState.hidden = true;

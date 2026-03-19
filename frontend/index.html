@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=7">
+    <link rel="stylesheet" href="/static/style.css?v=8">
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 </head>
 
@@ -29,6 +29,23 @@
                 <button class="lang-switcher__btn active" data-lang="en">EN</button>
                 <button class="lang-switcher__btn" data-lang="vi">VI</button>
             </div>
+            <!-- Theme Mode Toggle -->
+            <button class="theme-toggle" id="themeToggle" title="Toggle light/dark mode">
+                <svg class="theme-toggle__icon theme-toggle__sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="5"/>
+                    <line x1="12" y1="1" x2="12" y2="3"/>
+                    <line x1="12" y1="21" x2="12" y2="23"/>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                    <line x1="1" y1="12" x2="3" y2="12"/>
+                    <line x1="21" y1="12" x2="23" y2="12"/>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                </svg>
+                <svg class="theme-toggle__icon theme-toggle__moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+            </button>
             <div class="topnav__status" id="statusBadge">
                 <span class="status-dot"></span>
                 <span id="statusText" data-i18n="status.ready">Ready</span>
@@ -136,6 +153,68 @@
                 </div>
                 <h2 class="empty-state__title" data-i18n="empty.title">Create Your Presentation</h2>
                 <p class="empty-state__desc"><span data-i18n="empty.desc">Upload a document or write a prompt to get started.</span><br><span data-i18n="empty.desc2">AI will generate beautiful slides for you.</span></p>
+
+                <!-- Usage Guide -->
+                <div class="usage-guide" id="usageGuide">
+                    <h3 class="usage-guide__title" data-i18n="guide.title">📖 How to Use</h3>
+                    <div class="usage-guide__cards">
+                        <!-- Case 1: From Document -->
+                        <div class="guide-card">
+                            <div class="guide-card__header">
+                                <span class="guide-card__icon">📄</span>
+                                <h4 class="guide-card__title" data-i18n="guide.case1.title">From Document (DOCX/PDF)</h4>
+                            </div>
+                            <ol class="guide-card__steps">
+                                <li>
+                                    <span class="guide-step__icon">⬆️</span>
+                                    <span data-i18n="guide.case1.step1">Upload your .docx or .pdf file using the upload area on the left sidebar</span>
+                                </li>
+                                <li>
+                                    <span class="guide-step__icon">✏️</span>
+                                    <span data-i18n="guide.case1.step2">Write a prompt to guide the AI (e.g., "Create slides from this document" or "Summarize into 8 slides")</span>
+                                </li>
+                                <li>
+                                    <span class="guide-step__icon">🎨</span>
+                                    <span data-i18n="guide.case1.step3">Choose a theme or leave it as "Auto" for AI to pick the best one</span>
+                                </li>
+                                <li>
+                                    <span class="guide-step__icon">⚡</span>
+                                    <span data-i18n="guide.case1.step4">Click "Generate Slides" and wait for AI to create your presentation</span>
+                                </li>
+                            </ol>
+                        </div>
+
+                        <!-- Case 2: From Prompt -->
+                        <div class="guide-card">
+                            <div class="guide-card__header">
+                                <span class="guide-card__icon">💬</span>
+                                <h4 class="guide-card__title" data-i18n="guide.case2.title">From Prompt (No Document)</h4>
+                            </div>
+                            <ol class="guide-card__steps">
+                                <li>
+                                    <span class="guide-step__icon">✏️</span>
+                                    <span data-i18n="guide.case2.step1">Write a detailed prompt describing your presentation topic and structure</span>
+                                </li>
+                                <li>
+                                    <span class="guide-step__icon">💡</span>
+                                    <span data-i18n="guide.case2.step2">Example: "Create 6 slides about Digital Marketing trends 2026 with intro, key trends, strategies, tools, case study, and conclusion"</span>
+                                </li>
+                                <li>
+                                    <span class="guide-step__icon">🎨</span>
+                                    <span data-i18n="guide.case2.step3">Choose a theme or leave it as "Auto" for AI to pick the best one</span>
+                                </li>
+                                <li>
+                                    <span class="guide-step__icon">⚡</span>
+                                    <span data-i18n="guide.case2.step4">Click "Generate Slides" — AI will create content from scratch based on your prompt</span>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
+                    <p class="usage-guide__tip">
+                        <span class="guide-tip__icon">💡</span>
+                        <span data-i18n="guide.tip">Tip: After generating, you can edit individual slides, undo changes, and download as PPTX.</span>
+                    </p>
+                </div>
             </div>
 
             <!-- Theme Preview State -->

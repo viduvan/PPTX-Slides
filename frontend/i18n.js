@@ -89,6 +89,20 @@ const translations = {
         'preview.slide.title': 'Title Slide',
         'preview.slide.content': 'Content Slide',
         'preview.slide.ending': 'Ending Slide',
+
+        // ── Usage Guide ──
+        'guide.title': '📖 How to Use',
+        'guide.case1.title': 'From Document (DOCX/PDF)',
+        'guide.case1.step1': 'Upload your .docx or .pdf file using the upload area on the left sidebar',
+        'guide.case1.step2': 'Write a prompt to guide the AI (e.g., "Create slides from this document" or "Summarize into 8 slides")',
+        'guide.case1.step3': 'Choose a theme or leave it as "Auto" for AI to pick the best one',
+        'guide.case1.step4': 'Click "Generate Slides" and wait for AI to create your presentation',
+        'guide.case2.title': 'From Prompt (No Document)',
+        'guide.case2.step1': 'Write a detailed prompt describing your presentation topic and structure',
+        'guide.case2.step2': 'Example: "Create 6 slides about Digital Marketing trends 2026 with intro, key trends, strategies, tools, case study, and conclusion"',
+        'guide.case2.step3': 'Choose a theme or leave it as "Auto" for AI to pick the best one',
+        'guide.case2.step4': 'Click "Generate Slides" — AI will create content from scratch based on your prompt',
+        'guide.tip': 'Tip: After generating, you can edit individual slides, undo changes, and download as PPTX.',
     },
 
     vi: {
@@ -174,6 +188,20 @@ const translations = {
         'preview.slide.title': 'Slide tiêu đề',
         'preview.slide.content': 'Slide nội dung',
         'preview.slide.ending': 'Slide kết thúc',
+
+        // ── Usage Guide ──
+        'guide.title': '📖 Hướng dẫn sử dụng',
+        'guide.case1.title': 'Tạo từ tài liệu (DOCX/PDF)',
+        'guide.case1.step1': 'Tải file .docx hoặc .pdf lên bằng ô tải tài liệu ở thanh bên trái',
+        'guide.case1.step2': 'Nhập yêu cầu để hướng dẫn AI (ví dụ: "Tạo slide từ tài liệu này" hoặc "Tóm tắt thành 8 slide")',
+        'guide.case1.step3': 'Chọn giao diện hoặc để "Tự động" để AI chọn giao diện phù hợp nhất',
+        'guide.case1.step4': 'Nhấn "Tạo Slides" và đợi AI tạo bài thuyết trình cho bạn',
+        'guide.case2.title': 'Tạo từ yêu cầu (Không cần tài liệu)',
+        'guide.case2.step1': 'Nhập yêu cầu chi tiết mô tả chủ đề và cấu trúc bài thuyết trình',
+        'guide.case2.step2': 'Ví dụ: "Tạo 6 slide về xu hướng Marketing số 2026 gồm giới thiệu, xu hướng chính, chiến lược, công cụ, nghiên cứu điển hình và kết luận"',
+        'guide.case2.step3': 'Chọn giao diện hoặc để "Tự động" để AI chọn giao diện phù hợp nhất',
+        'guide.case2.step4': 'Nhấn "Tạo Slides" — AI sẽ tạo nội dung hoàn toàn mới dựa trên yêu cầu của bạn',
+        'guide.tip': 'Mẹo: Sau khi tạo xong, bạn có thể chỉnh sửa từng slide, hoàn tác thay đổi và tải xuống dạng PPTX.',
     },
 };
 

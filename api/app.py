@@ -50,6 +50,13 @@ async def lifespan(app: FastAPI):
 
     asyncio.create_task(_preload())
 
+    # Pre-generate slide thumbnails in background
+    async def _generate_thumbs():
+        from .services.thumbnail_generator import generate_all_thumbnails
+        await asyncio.to_thread(generate_all_thumbnails)
+
+    asyncio.create_task(_generate_thumbs())
+
     yield
 
     # Shutdown
@@ -89,6 +96,11 @@ app.add_middleware(
 app.include_router(slides.router)
 app.include_router(upload.router)
 app.include_router(sessions.router)
+
+# Serve slide thumbnails as static files
+THUMBNAILS_DIR = Path(__file__).resolve().parent.parent / "assets" / "thumbnails"
+THUMBNAILS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/thumbnails", StaticFiles(directory=str(THUMBNAILS_DIR)), name="thumbnails")
 
 # Serve frontend static files (CSS, JS)
 if FRONTEND_DIR.exists():
