@@ -382,18 +382,47 @@ def build_from_template(
                     para.alignment = PP_ALIGN.CENTER
         else:
             # === CONTENT SLIDES: title TOP, body BELOW (fixed positions) ===
+            # Check if this slide has an image
+            slide_num = slide_data.get("slide_number")
+            img_path = None
+            if image_paths and slide_num is not None:
+                img_path = image_paths.get(slide_num)
+                if img_path and not Path(img_path).exists():
+                    logger.warning(f"Image not found for slide {slide_num}: {img_path}")
+                    img_path = None
+
+            has_image = img_path is not None
+
+            # If image, split layout 60/40 (narrower text, image on right)
+            if has_image:
+                content_width = Inches(7.5)
+            else:
+                content_width = prs.slide_width - Inches(1.6)
+
             if title_text:
                 title_box = slide.shapes.add_textbox(
                     Inches(0.8), Inches(0.5),
-                    prs.slide_width - Inches(1.6), Inches(1.0)
+                    content_width, Inches(1.0)
                 )
                 _fill_text_frame(title_box.text_frame, title_text, is_title=True)
             if content_text:
                 body_box = slide.shapes.add_textbox(
                     Inches(0.8), Inches(1.7),
-                    prs.slide_width - Inches(1.6), prs.slide_height - Inches(2.5)
+                    content_width, prs.slide_height - Inches(2.5)
                 )
                 _fill_text_frame(body_box.text_frame, content_text, is_title=False)
+
+            # Add image on the right side
+            if has_image:
+                try:
+                    slide.shapes.add_picture(
+                        str(img_path),
+                        Inches(8.8), Inches(1.8),
+                        Inches(4.0), Inches(4.5),
+                    )
+                    logger.info(f"Added image to slide {slide_num}: {img_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to add image to slide {slide_num}: {e}")
 
         # Speaker notes
         if narration_text:
