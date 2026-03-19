@@ -995,6 +995,209 @@ body {
     }
 }
 
+/* ── Theme Preview ──────────────────────────────────────── */
+.theme-preview {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    animation: fadeIn 0.4s ease;
+}
+
+.theme-preview__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    flex-shrink: 0;
+}
+
+.theme-preview__info {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.theme-preview__emoji {
+    font-size: 36px;
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-lg);
+    background: var(--bg-glass);
+    border: 1px solid var(--border-subtle);
+}
+
+.theme-preview__name {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.theme-preview__category {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.theme-preview__actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* Slide Mockup Carousel */
+.theme-preview__slides {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    overflow-y: auto;
+    padding-bottom: 20px;
+    align-content: start;
+}
+
+/* Individual Slide Mockup */
+.preview-slide {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    border: 1px solid var(--border-medium);
+    box-shadow: var(--shadow-md);
+    transition: all var(--transition-normal);
+    animation: slideUp 0.5s ease both;
+}
+
+.preview-slide:hover {
+    transform: translateY(-3px) scale(1.01);
+    box-shadow: var(--shadow-lg), 0 0 24px rgba(0, 0, 0, 0.3);
+}
+
+.preview-slide__bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+}
+
+.preview-slide__label {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(4px);
+    z-index: 2;
+}
+
+/* Slide inner content */
+.preview-slide__inner {
+    position: relative;
+    z-index: 1;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 8% 8%;
+}
+
+/* Title slide layout */
+.preview-slide--title .preview-slide__inner {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 12px;
+}
+
+.preview-slide__title {
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 0;
+}
+
+.preview-slide--title .preview-slide__title {
+    font-size: clamp(16px, 2.5vw, 28px);
+}
+
+.preview-slide--content .preview-slide__title {
+    font-size: clamp(13px, 1.8vw, 20px);
+    margin-bottom: 4%;
+}
+
+.preview-slide__subtitle {
+    font-size: clamp(10px, 1.2vw, 14px);
+    opacity: 0.85;
+    line-height: 1.4;
+}
+
+.preview-slide__body {
+    font-size: clamp(9px, 1vw, 12px);
+    line-height: 1.8;
+    white-space: pre-line;
+    opacity: 0.9;
+}
+
+/* Accent bar at bottom of slide */
+.preview-slide__accent {
+    position: absolute;
+    bottom: 8%;
+    left: 8%;
+    right: 8%;
+    height: 3px;
+    border-radius: 2px;
+    z-index: 1;
+}
+
+/* Ending slide */
+.preview-slide--ending .preview-slide__inner {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 10px;
+}
+
+.preview-slide--ending .preview-slide__title {
+    font-size: clamp(18px, 3vw, 32px);
+}
+
+/* Preview eye button on theme options */
+.theme-option__preview {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: all var(--transition-fast);
+    z-index: 2;
+    padding: 0;
+}
+
+.theme-option:hover .theme-option__preview {
+    opacity: 1;
+}
+
+.theme-option__preview:hover {
+    background: var(--accent-primary);
+    color: white;
+    transform: scale(1.15);
+}
+
+.theme-option {
+    position: relative;
+}
+
 /* ── Scrollbar ──────────────────────────────────────────── */
 ::-webkit-scrollbar {
     width: 6px;
@@ -1044,6 +1247,16 @@ body {
     }
 
     .slides-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .theme-preview__header {
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+    }
+
+    .theme-preview__slides {
         grid-template-columns: 1fr;
     }
 

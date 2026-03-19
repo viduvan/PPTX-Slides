@@ -80,6 +80,15 @@ const translations = {
         'toast.download.error': 'Download error:',
         'upload.words': 'words',
         'upload.summarized': '(summarized)',
+
+        // ── Theme Preview ──
+        'preview.heading': 'Theme Preview',
+        'preview.close': 'Close',
+        'preview.category': 'Category',
+        'preview.select': 'Use This Theme',
+        'preview.slide.title': 'Title Slide',
+        'preview.slide.content': 'Content Slide',
+        'preview.slide.ending': 'Ending Slide',
     },
 
     vi: {
@@ -156,6 +165,15 @@ const translations = {
         'toast.download.error': 'Lỗi tải xuống:',
         'upload.words': 'từ',
         'upload.summarized': '(đã tóm tắt)',
+
+        // ── Theme Preview ──
+        'preview.heading': 'Xem trước giao diện',
+        'preview.close': 'Đóng',
+        'preview.category': 'Danh mục',
+        'preview.select': 'Dùng giao diện này',
+        'preview.slide.title': 'Slide tiêu đề',
+        'preview.slide.content': 'Slide nội dung',
+        'preview.slide.ending': 'Slide kết thúc',
     },
 };
 

@@ -53,6 +53,62 @@ async def list_themes():
     return {"categories": categories, "default": "auto"}
 
 
+@router.get("/themes/{theme_id}/preview")
+async def preview_theme(theme_id: str):
+    """Return theme colors and sample slides for visual preview."""
+    if theme_id not in THEMES:
+        raise HTTPException(status_code=404, detail=f"Theme '{theme_id}' not found")
+
+    colors = THEMES[theme_id]
+    reg = THEME_REGISTRY.get(theme_id, {})
+    cat_id = reg.get("category", "")
+    cat_info = THEME_CATEGORIES.get(cat_id, {})
+
+    def rgb_hex(c):
+        return "#{:02x}{:02x}{:02x}".format(int(c[0]), int(c[1]), int(c[2]))
+
+    return {
+        "theme_id": theme_id,
+        "label": reg.get("label", theme_id),
+        "label_vi": reg.get("label_vi", reg.get("label", theme_id)),
+        "emoji": reg.get("emoji", "🎨"),
+        "category": cat_info.get("label", cat_id),
+        "category_vi": cat_info.get("label_vi", cat_id),
+        "colors": {
+            "bg_dark": rgb_hex(colors["bg_dark"]),
+            "bg_gradient": rgb_hex(colors["bg_gradient"]),
+            "title": rgb_hex(colors["title"]),
+            "subtitle": rgb_hex(colors.get("subtitle", colors["title"])),
+            "body": rgb_hex(colors["body"]),
+            "accent": rgb_hex(colors["accent"]),
+            "accent_light": rgb_hex(colors["accent_light"]),
+            "muted": rgb_hex(colors["muted"]),
+        },
+        "sample_slides": [
+            {
+                "type": "title",
+                "title": "Your Presentation Title",
+                "subtitle": "A compelling subtitle that captures your audience's attention",
+            },
+            {
+                "type": "content",
+                "title": "Key Insights & Analysis",
+                "content": "•  Strategic overview of market trends\n•  Data-driven decision making\n•  Innovation and growth opportunities\n•  Building sustainable competitive advantages",
+            },
+            {
+                "type": "content",
+                "title": "Implementation Roadmap",
+                "content": "•  Phase 1: Research & Discovery\n•  Phase 2: Design & Prototyping\n•  Phase 3: Development & Testing\n•  Phase 4: Launch & Optimization",
+            },
+            {
+                "type": "ending",
+                "title": "Thank You!",
+                "subtitle": "Questions & Discussion",
+            },
+        ],
+    }
+
+
 @router.post("/generate", response_model=GenerateResponse)
 async def generate_slides(request: GenerateRequest):
     """

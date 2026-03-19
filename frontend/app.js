@@ -67,6 +67,15 @@ const dom = {
 
     // Theme
     themeSelector: $('#themeSelector'),
+
+    // Theme Preview
+    themePreview: $('#themePreview'),
+    previewEmoji: $('#previewEmoji'),
+    previewName: $('#previewName'),
+    previewCategory: $('#previewCategory'),
+    previewSlides: $('#previewSlides'),
+    previewCloseBtn: $('#previewCloseBtn'),
+    previewSelectBtn: $('#previewSelectBtn'),
 };
 
 // ── Initialization ─────────────────────────────────────────
@@ -77,6 +86,7 @@ function init() {
     setupEdit();
     setupModal();
     setupKeyboard();
+    setupThemePreview();
     loadThemes();
 }
 
@@ -508,6 +518,12 @@ async function loadThemes() {
                 btn.innerHTML = `
                     <span class="theme-option__color" style="background: linear-gradient(135deg, ${theme.accent}, ${theme.bg});">${theme.emoji}</span>
                     <span class="theme-option__label">${themeLabel}</span>
+                    <button class="theme-option__preview" title="${t('preview.heading')}" data-preview="${theme.id}">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                    </button>
                 `;
                 panel.appendChild(btn);
             });
@@ -520,6 +536,13 @@ async function loadThemes() {
 
         // Click handlers for all theme buttons
         container.addEventListener('click', (e) => {
+            // Preview eye button clicked
+            const previewBtn = e.target.closest('.theme-option__preview');
+            if (previewBtn) {
+                e.stopPropagation();
+                showThemePreview(previewBtn.dataset.preview);
+                return;
+            }
             const btn = e.target.closest('.theme-option');
             if (!btn) return;
             selectTheme(btn.dataset.theme);
@@ -536,6 +559,98 @@ function selectTheme(themeId) {
     dom.themeSelector.querySelectorAll('.theme-option').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.theme === themeId);
     });
+}
+
+// ── Theme Preview ──────────────────────────────────────────
+function setupThemePreview() {
+    dom.previewCloseBtn.addEventListener('click', closeThemePreview);
+    dom.previewSelectBtn.addEventListener('click', () => {
+        if (state.previewThemeId) {
+            selectTheme(state.previewThemeId);
+            showToast(`${t('preview.select')}: ${state.previewThemeId}`, 'success');
+        }
+        closeThemePreview();
+    });
+}
+
+async function showThemePreview(themeId) {
+    try {
+        setStatus(t('preview.heading'), 'loading');
+        const res = await fetch(`${API_BASE}/api/slides/themes/${themeId}/preview`);
+        if (!res.ok) throw new Error('Preview fetch failed');
+
+        const data = await res.json();
+        state.previewThemeId = data.theme_id;
+
+        // Populate header
+        dom.previewEmoji.textContent = data.emoji;
+        dom.previewName.textContent = currentLang === 'vi' ? data.label_vi : data.label;
+        dom.previewCategory.textContent =
+            `${t('preview.category')}: ${currentLang === 'vi' ? data.category_vi : data.category}`;
+
+        // Render slide mockups
+        const c = data.colors;
+        dom.previewSlides.innerHTML = '';
+
+        data.sample_slides.forEach((slide, idx) => {
+            const isTitle = slide.type === 'title';
+            const isEnding = slide.type === 'ending';
+            const typeClass = isTitle ? 'preview-slide--title'
+                            : isEnding ? 'preview-slide--ending'
+                            : 'preview-slide--content';
+
+            const labelKey = isTitle ? 'preview.slide.title'
+                           : isEnding ? 'preview.slide.ending'
+                           : 'preview.slide.content';
+
+            let innerHtml = '';
+            if (isTitle || isEnding) {
+                innerHtml = `
+                    <h3 class="preview-slide__title" style="color:${c.title};">${escapeHtml(slide.title)}</h3>
+                    ${slide.subtitle ? `<p class="preview-slide__subtitle" style="color:${c.subtitle};">${escapeHtml(slide.subtitle)}</p>` : ''}
+                `;
+            } else {
+                innerHtml = `
+                    <h3 class="preview-slide__title" style="color:${c.title};">${escapeHtml(slide.title)}</h3>
+                    <p class="preview-slide__body" style="color:${c.body};">${escapeHtml(slide.content || '')}</p>
+                `;
+            }
+
+            const card = document.createElement('div');
+            card.className = `preview-slide ${typeClass}`;
+            card.style.animationDelay = `${idx * 100}ms`;
+            card.innerHTML = `
+                <div class="preview-slide__bg" style="background: linear-gradient(315deg, ${c.bg_dark}, ${c.bg_gradient});"></div>
+                <span class="preview-slide__label" style="color:${c.muted};">${t(labelKey)}</span>
+                <div class="preview-slide__inner">${innerHtml}</div>
+                <div class="preview-slide__accent" style="background: linear-gradient(90deg, ${c.accent}, ${c.accent_light});"></div>
+            `;
+            dom.previewSlides.appendChild(card);
+        });
+
+        // Show preview, hide others
+        dom.emptyState.hidden = true;
+        dom.loadingState.hidden = true;
+        dom.slidesArea.hidden = true;
+        dom.themePreview.hidden = false;
+
+        setStatus(t('status.ready'), 'ready');
+    } catch (err) {
+        setStatus(t('status.error'), 'error');
+        showToast(`Preview error: ${err.message}`, 'error');
+        setTimeout(() => setStatus(t('status.ready'), 'ready'), 3000);
+    }
+}
+
+function closeThemePreview() {
+    dom.themePreview.hidden = true;
+    state.previewThemeId = null;
+
+    if (state.slides.length > 0) {
+        dom.slidesArea.hidden = false;
+    } else {
+        dom.emptyState.hidden = false;
+    }
 }
 
 // ── Start ──────────────────────────────────────────────────

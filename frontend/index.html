@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=6">
+    <link rel="stylesheet" href="/static/style.css?v=7">
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 </head>
 
@@ -138,6 +138,37 @@
                 <p class="empty-state__desc"><span data-i18n="empty.desc">Upload a document or write a prompt to get started.</span><br><span data-i18n="empty.desc2">AI will generate beautiful slides for you.</span></p>
             </div>
 
+            <!-- Theme Preview State -->
+            <div class="theme-preview" id="themePreview" hidden>
+                <div class="theme-preview__header">
+                    <div class="theme-preview__info">
+                        <span class="theme-preview__emoji" id="previewEmoji">🎨</span>
+                        <div>
+                            <h2 class="theme-preview__name" id="previewName">Theme Name</h2>
+                            <span class="theme-preview__category" id="previewCategory">Category</span>
+                        </div>
+                    </div>
+                    <div class="theme-preview__actions">
+                        <button class="btn btn--primary" id="previewSelectBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            <span data-i18n="preview.select">Use This Theme</span>
+                        </button>
+                        <button class="btn btn--ghost" id="previewCloseBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                            <span data-i18n="preview.close">Close</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="theme-preview__slides" id="previewSlides">
+                    <!-- Slide mockup cards will be injected here -->
+                </div>
+            </div>
+
             <!-- Loading State -->
             <div class="loading-state" id="loadingState" hidden>
                 <div class="loading-spinner"></div>
@@ -221,8 +252,8 @@
     <!-- ═══ Toast Notifications ═══ -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <script src="/static/i18n.js?v=2"></script>
-    <script src="/static/app.js?v=6"></script>
+    <script src="/static/i18n.js?v=3"></script>
+    <script src="/static/app.js?v=7"></script>
 </body>
 
 </html>
