@@ -565,7 +565,30 @@ async function loadThemes() {
             tabContent.appendChild(panel);
         });
 
-        container.appendChild(tabBar);
+        // Wrap tabBar in a scroll wrapper with fade gradients
+        const tabsWrapper = document.createElement('div');
+        tabsWrapper.className = 'theme-tabs-wrapper';
+        tabsWrapper.appendChild(tabBar);
+
+        // Scroll hint below tabs (if more than 3 categories)
+        if (data.categories.length > 3) {
+            const hint = document.createElement('div');
+            hint.className = 'theme-tabs-hint';
+            const hintLabel = currentLang === 'vi' ? `${data.categories.length} danh mục` : `${data.categories.length} categories`;
+            hint.innerHTML = `
+                <span>← ${hintLabel} →</span>
+            `;
+            tabsWrapper.appendChild(hint);
+        }
+
+        // Scroll event to toggle fade gradients on tabs
+        tabBar.addEventListener('scroll', () => {
+            const { scrollLeft, scrollWidth, clientWidth } = tabBar;
+            tabsWrapper.classList.toggle('scrolled-start', scrollLeft > 4);
+            tabsWrapper.classList.toggle('scrolled-end', scrollLeft + clientWidth >= scrollWidth - 4);
+        });
+
+        container.appendChild(tabsWrapper);
         container.appendChild(tabContent);
 
         // Click handlers for all theme buttons
