@@ -1,0 +1,324 @@
+﻿
+=== business ===
+
+  consulting_teal.pptx (86 KB)
+    Slides: 3
+    Slide 1 (layout: Title Slide):
+      "Presentation Title"
+    Slide 2 (layout: Title, 2 Content):
+      "<number>"
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Blank Slide):
+      "<number>"
+      "THANKS!"
+      "Any questions?
+You can find me at
+@username & user@mail.me"
+
+  corporate_blue.pptx (3325 KB)
+    Slides: 3
+    Slide 1 (layout: Blank Slide):
+      "Presentation Title"
+    Slide 2 (layout: Blank Slide):
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Blank Slide):
+      "Thank You"
+      "Questions? Contact us"
+
+  executive_gray.pptx (821 KB)
+    Slides: 3
+    Slide 1 (layout: Title Slide):
+      "Presentation Title"
+    Slide 2 (layout: Title, 2 Content):
+      "<number>"
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Title, 2 Content):
+      "<number>"
+      "Thank You"
+      "Questions? Contact us"
+
+  finance_green.pptx (85 KB)
+    Slides: 3
+    Slide 1 (layout: Title Slide):
+      "Presentation Title"
+    Slide 2 (layout: Title, 2 Content):
+      "<number>"
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Title, 2 Content):
+      "<number>"
+      "Thank You"
+      "Questions? Contact us"
+
+  legal_navy.pptx (169 KB)
+    Slides: 3
+    Slide 1 (layout: Title Slide):
+      "Presentation Title"
+    Slide 2 (layout: Blank Slide):
+      "<number>"
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Blank Slide):
+      "<number>"
+      "Thank You"
+      "Questions? Contact us"
+
+=== creative ===
+
+  artistic_purple.pptx (796 KB)
+    Slides: 3
+    Slide 1 (layout: Blank Slide):
+      "Presentation Title"
+    Slide 2 (layout: Blank Slide):
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Blank Slide):
+      "Thank You"
+
+  bold_orange.pptx (12949 KB)
+    Slides: 3
+    Slide 1 (layout: Blank Slide):
+      "Presentation Title"
+    Slide 2 (layout: Blank Slide):
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Blank Slide):
+      "Thank You"
+
+  neon_pop.pptx (289 KB)
+    Slides: 3
+    Slide 1 (layout: Blank Slide):
+      "Presentation Title"
+    Slide 2 (layout: Blank Slide):
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Blank Slide):
+      "Thank You"
+      "Questions? Contact us"
+
+  retro_vintage.pptx (306 KB)
+    Slides: 3
+    Slide 1 (layout: Blank Slide):
+      "<number>"
+      "Presentation Title"
+    Slide 2 (layout: Title, 2 Content):
+      "<number>"
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Title, 2 Content):
+      "<number>"
+      "Thank You"
+      "Questions? Contact us"
+
+  rose_pink.pptx (299 KB)
+    Slides: 3
+    Slide 1 (layout: Title Slide):
+      "Presentation Title"
+    Slide 2 (layout: Title, 2 Content):
+      "<number>"
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Title, 2 Content):
+      "<number>"
+      "Thank You"
+
+=== education ===
+
+  campus_green.pptx (368 KB)
+    Slides: 3
+    Slide 1 (layout: Blank Slide):
+      "http://www.free-powerpoint-templates-design.com"
+      "Presentation Title"
+    Slide 2 (layout: Blank Slide):
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Blank Slide):
+      "Thank you"
+
+  chalkboard.pptx (1258 KB)
+    Slides: 3
+    Slide 1 (layout: Blank Slide):
+      "Presentation Title"
+      "Template: Chalkboard"
+    Slide 2 (layout: Title, Content):
+      "<number>"
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Blank Slide):
+      "<number>"
+      "THANKS!"
+
+  library_brown.pptx (525 KB)
+    Slides: 3
+    Slide 1 (layout: Blank Slide):
+      "Presentation Title"
+    Slide 2 (layout: Title, 2 Content):
+      "<number>"
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Blank Slide):
+
+  scholar_blue.pptx (89 KB)
+    Slides: 3
+    Slide 1 (layout: Title Slide):
+      "Presentation Title"
+    Slide 2 (layout: Title Slide):
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Title Slide):
+      "Thank You"
+
+  science_teal.pptx (175 KB)
+    Slides: 3
+    Slide 1 (layout: Blank Slide):
+      "Presentation Title"
+    Slide 2 (layout: Blank Slide):
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Blank Slide):
+      "Thank You"
+
+=== technology ===
+
+  ai_blue.pptx (5002 KB)
+    Slides: 3
+    Slide 1 (layout: Blank Slide):
+      "Presentation Title"
+    Slide 2 (layout: Blank Slide):
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Blank Slide):
+      "Thank You"
+      "Questions? Contact us"
+
+  cyber_punk.pptx (119 KB)
+    Slides: 3
+    Slide 1 (layout: Title Slide):
+      "Presentation Title"
+    Slide 2 (layout: Title, 2 Content):
+      "<number>"
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Title, 2 Content):
+      "<number>"
+      "Thank You"
+      "Questions? Contact us"
+
+  data_orange.pptx (5631 KB)
+    Slides: 3
+    Slide 1 (layout: Title Slide):
+      "Presentation Title"
+    Slide 2 (layout: Title, 2 Content):
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Title, 2 Content):
+      "Thank You"
+      "Questions? Contact us"
+
+  matrix_green.pptx (5186 KB)
+    Slides: 3
+    Slide 1 (layout: Blank Slide):
+      "Presentation Title"
+    Slide 2 (layout: Blank Slide):
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Blank Slide):
+      "Thank You"
+      "Questions? Contact us"
+
+  quantum_violet.pptx (116 KB)
+    Slides: 3
+    Slide 1 (layout: Blank Slide):
+      "<number>"
+      "Presentation Title"
+    Slide 2 (layout: Title, 2 Content):
+      "<number>"
+      "Content Slide Title"
+      "ò  Sample point one
+  ò  Key idea two
+  ò  Styled bullets
+  ò  Auto-fit sizing
+  ò  Gradient backgro"
+    Slide 3 (layout: Title, 2 Content):
+      "<number>"
+      "Thank You"
+      "Questions? Contact us"

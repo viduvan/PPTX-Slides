@@ -42,7 +42,7 @@ venv/
 ENV/
 
 # Project Specific
-tmp/
+tmp/images/
 
 *.docx
 *.pdf
