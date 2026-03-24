@@ -42,7 +42,7 @@ def _extract_json_from_text(text: str) -> str | None:
 
 async def summarize_content(text: str) -> str:
     """
-    Summarize a piece of text using Gemini.
+    Summarize a piece of text using Gemini, optimized for slide generation.
 
     Args:
         text: The text content to summarize.
@@ -53,10 +53,16 @@ async def summarize_content(text: str) -> str:
     client = _get_client()
 
     prompt = (
-        "You are a document summarizer. Shorten the following article while "
-        "capturing all key points. Keep the original format. "
-        "Output only the shortened article.\n\n"
-        f"Article:\n{text}"
+        "You are a document summarizer preparing content for a presentation. "
+        "Shorten the following text while preserving:\n"
+        "- Key facts, statistics, and numbers\n"
+        "- Main arguments and conclusions\n"
+        "- Important examples and case studies\n"
+        "- Logical structure and flow\n\n"
+        "Remove redundancy, filler text, and overly detailed explanations. "
+        "Keep the content dense and informative. "
+        "Output ONLY the shortened text, no commentary.\n\n"
+        f"Text to summarize:\n{text}"
     )
 
     try:
@@ -65,7 +71,7 @@ async def summarize_content(text: str) -> str:
             contents=prompt,
         )
         result = response.text
-        logger.debug(f"Summarization result length: {len(result)} chars")
+        logger.debug(f"Summarization result: {len(text.split())} → {len(result.split())} words")
         return result
     except Exception as e:
         logger.error(f"Error during summarization: {e}")
@@ -143,6 +149,17 @@ async def generate_slides(
     # Reset narration to default for existing slides
     for slide in existing_slides:
         slide["narration"] = ""
+
+    # Safety: truncate word_content if still too large
+    if word_content:
+        wc = len(word_content.split())
+        if wc > settings.MAX_CONTENT_FOR_LLM:
+            logger.warning(
+                f"word_content is {wc} words, truncating to {settings.MAX_CONTENT_FOR_LLM} "
+                f"before sending to LLM"
+            )
+            words = word_content.split()
+            word_content = " ".join(words[:settings.MAX_CONTENT_FOR_LLM])
 
     # Build the system instruction
     system_parts = []
