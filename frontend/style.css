@@ -134,7 +134,11 @@
     display: none !important;
 }
 
-html,
+html {
+    height: 100%;
+    overflow: hidden;
+}
+
 body {
     height: 100%;
     font-family: var(--font);
@@ -339,7 +343,7 @@ body {
     display: flex;
     flex-direction: column;
     padding: 20px;
-    gap: 16px;
+    gap: 0;
     background: var(--bg-secondary);
     border-right: 1px solid var(--border-subtle);
     overflow-y: auto;
@@ -349,11 +353,21 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-shrink: 0;
+}
+
+.sidebar__section:first-child {
+    padding-top: 0;
+}
+
+.sidebar__section:last-child {
+    border-bottom: none;
 }
 
 .sidebar__section--grow {
-    flex: 1;
-    min-height: 0;
+    flex: 0 0 auto;
 }
 
 .sidebar__heading {
@@ -372,7 +386,9 @@ body {
 }
 
 .sidebar__actions {
-    padding-top: 8px;
+    padding-top: 16px;
+    flex-shrink: 0;
+    margin-top: auto;
 }
 
 /* ── Theme Selector ────────────────────────────────────── */
@@ -1534,32 +1550,49 @@ body {
 
 /* ── Responsive ─────────────────────────────────────────── */
 @media (max-width: 768px) {
+    html,
+    body {
+        overflow: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
     .app {
         flex-direction: column;
+        height: auto;
+        min-height: calc(100vh - var(--topnav-height));
     }
 
     .sidebar {
         width: 100%;
         min-width: unset;
         height: auto;
-        max-height: 50vh;
-        min-height: 200px;
+        max-height: none;
+        min-height: unset;
         border-right: none;
-        border-bottom: 1px solid var(--border-subtle);
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
+        border-bottom: 2px solid var(--border-medium);
+        overflow-y: visible;
+        overflow-x: hidden;
+        flex-shrink: 0;
+    }
+
+    .sidebar__section {
+        flex-shrink: 0;
     }
 
     .sidebar__section--grow {
         flex: unset;
+        min-height: unset;
     }
 
     .prompt-input {
         min-height: 80px;
+        flex: unset;
     }
 
     .main {
         padding: 16px;
+        flex: 1;
+        min-height: 300px;
     }
 
     .slide-viewer__stage {
@@ -1602,12 +1635,20 @@ body {
 
 @media (max-width: 480px) {
     .sidebar {
-        max-height: 55vh;
+        max-height: none;
         padding: 14px;
-        gap: 12px;
     }
 
     .theme-category {
         gap: 4px;
+    }
+
+    .upload-zone {
+        padding: 20px 12px;
+    }
+
+    .upload-zone__icon {
+        width: 32px;
+        height: 32px;
     }
 }
