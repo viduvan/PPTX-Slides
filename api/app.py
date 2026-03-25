@@ -61,13 +61,36 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("PPTX-Slides API shutting down...")
-    # Clean up temp files
+    # Clean up temp PPTX files
     if settings.TEMP_DIR.exists():
         for f in settings.TEMP_DIR.glob("presentation_*.pptx"):
             try:
                 f.unlink()
             except Exception:
                 pass
+        # Clean up temp PDF dirs from thumbnail generation
+        import shutil
+        for d in settings.TEMP_DIR.glob("thumb_*"):
+            shutil.rmtree(d, ignore_errors=True)
+
+    # Clean up ALL session thumbnails (not theme thumbnails)
+    thumbnails_dir = Path(__file__).resolve().parent.parent / "assets" / "thumbnails"
+    if thumbnails_dir.exists():
+        count = 0
+        for f in thumbnails_dir.glob("session_*.jpg"):
+            try:
+                f.unlink()
+                count += 1
+            except Exception:
+                pass
+        for f in thumbnails_dir.glob("session_*.png"):
+            try:
+                f.unlink()
+                count += 1
+            except Exception:
+                pass
+        if count:
+            logger.info(f"Cleaned up {count} session thumbnails on shutdown")
 
 
 # Create FastAPI app

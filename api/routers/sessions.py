@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 
 from ..models.schemas import SessionInfo, SessionListResponse
 from ..core.session_manager import session_manager
+from ..services.thumbnail_generator import cleanup_session_thumbnails
 
 logger = logging.getLogger("odin_api.routers.sessions")
 router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
@@ -48,8 +49,13 @@ async def get_session(session_id: str):
 
 @router.delete("/{session_id}")
 async def delete_session(session_id: str):
-    """Delete a session."""
+    """Delete a session and clean up its thumbnails."""
     deleted = session_manager.delete_session(session_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    # Clean up session thumbnails
+    removed = cleanup_session_thumbnails(session_id)
+    logger.info(f"Deleted session '{session_id}', removed {removed} thumbnails")
+
     return {"message": "Session deleted successfully"}
