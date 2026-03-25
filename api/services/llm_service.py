@@ -213,6 +213,362 @@ def _extract_document_topic(text: str, max_words: int = 200) -> str:
     return subject_line
 
 
+# Vietnamese history keywords for detection (~200+ keywords)
+_VIETNAM_HISTORY_KEYWORDS = {
+    # ═══ HISTORICAL FIGURES ═══════════════════════════════════
+    # Founding & Legendary
+    "hùng vương", "vua hùng", "lạc long quân", "âu cơ", "an dương vương",
+    "sơn tinh", "thủy tinh", "thánh gióng",
+    # Bắc thuộc & Khởi nghĩa
+    "hai bà trưng", "trưng trắc", "trưng nhị", "bà triệu", "triệu thị trinh",
+    "lý bí", "lý nam đế", "triệu quang phục", "mai thúc loan", "mai hắc đế",
+    "phùng hưng", "bố cái đại vương", "khúc thừa dụ", "ngô quyền",
+    "dương đình nghệ",
+    # Nhà Đinh, Tiền Lê, Lý
+    "đinh bộ lĩnh", "đinh tiên hoàng", "lê hoàn", "lê đại hành",
+    "lý thái tổ", "lý công uẩn", "lý thường kiệt", "lý thánh tông",
+    "lý nhân tông", "lý thái tông",
+    # Nhà Trần
+    "trần hưng đạo", "trần quốc tuấn", "trần thái tông", "trần nhân tông",
+    "trần quốc toản", "trần khánh dư", "phạm ngũ lão", "yết kiêu",
+    "trần quang khải", "trần thủ độ", "trần bình trọng",
+    # Nhà Hồ, Hậu Trần, Lê
+    "hồ quý ly", "lê lợi", "lê thái tổ", "nguyễn trãi",
+    "lê thánh tông", "lê nhân tông", "ngô sĩ liên",
+    # Tây Sơn & Nguyễn
+    "quang trung", "nguyễn huệ", "nguyễn nhạc", "nguyễn lữ",
+    "gia long", "nguyễn ánh", "minh mạng", "tự đức",
+    "nguyễn du", "nguyễn đình chiểu", "nguyễn công trứ",
+    # Cận đại - Chống Pháp
+    "phan bội châu", "phan châu trinh", "phan đình phùng",
+    "hoàng hoa thám", "đề thám", "nguyễn thái học", "phạm hồng thái",
+    "trương định", "nguyễn trung trực", "tôn thất thuyết",
+    "lương văn can", "trần cao vân", "thái phiên",
+    # Cách mạng & Kháng chiến
+    "hồ chí minh", "ho chi minh", "bác hồ", "nguyễn ái quốc", "nguyễn sinh cung",
+    "nguyễn tất thành", "võ nguyên giáp", "phạm văn đồng", "trường chinh",
+    "lê duẩn", "tôn đức thắng", "hoàng văn thụ", "nguyễn văn cừ",
+    "trần phú", "lê hồng phong", "hà huy tập", "nguyễn thị minh khai",
+    "võ thị sáu", "nguyễn văn trỗi", "lý tự trọng", "kim đồng",
+    "la văn cầu", "phan đình giót", "tô vĩnh diện", "bế văn đàn",
+    "nguyễn viết xuân", "cù chính lan", "nguyễn chí thanh",
+    "hoàng minh thảo", "văn tiến dũng", "lê trọng tấn",
+    "trần văn trà", "nguyễn hữu an", "đồng sĩ nguyên",
+    "nguyễn thị bình", "đặng thùy trâm", "nguyễn văn bé",
+
+    # ═══ EVENTS & BATTLES ═════════════════════════════════════
+    # Cổ đại & Trung đại
+    "trận bạch đằng", "bạch đằng", "sông bạch đằng",
+    "trận chi lăng", "chi lăng", "trận đống đa", "đống đa",
+    "trận ngọc hồi", "trận rạch gầm", "rạch gầm xoài mút",
+    "trận như nguyệt", "trận bình lệ nguyên",
+    "khởi nghĩa lam sơn", "hội nghị diên hồng",
+    "chiếu dời đô", "nam quốc sơn hà",
+    # Chống Pháp
+    "kháng chiến chống pháp", "chống pháp",
+    "phong trào cần vương", "cần vương", "đông du",
+    "phong trào đông kinh nghĩa thục", "đông kinh nghĩa thục",
+    "khởi nghĩa yên bái", "yên bái",
+    "đảng cộng sản", "thành lập đảng", "xô viết nghệ tĩnh",
+    # Cách mạng & Kháng chiến chống Pháp hiện đại
+    "cách mạng tháng tám", "cách mạng tháng 8",
+    "tuyên ngôn độc lập", "2 tháng 9", "quốc khánh",
+    "toàn quốc kháng chiến", "thu đông", "chiến dịch biên giới",
+    "điện biên phủ", "dien bien phu", "trận điện biên phủ",
+    "hiệp định geneva", "genève",
+    # Kháng chiến chống Mỹ
+    "chống mỹ", "kháng chiến chống mỹ", "đế quốc mỹ",
+    "tết mậu thân", "mậu thân 1968",
+    "chiến dịch hồ chí minh", "đường trường sơn", "trường sơn",
+    "đường mòn hồ chí minh", "tổng tiến công",
+    "30 tháng 4", "giải phóng miền nam", "giải phóng sài gòn",
+    "thống nhất đất nước", "hiệp định paris",
+    "chiến thắng mùa xuân", "đại thắng mùa xuân",
+    "trận khe sanh", "khe sanh", "ấp bắc", "trận ấp bắc",
+    "vạn tường", "chiến dịch tây nguyên",
+    "phước long", "buôn ma thuột", "đà nẵng",
+    "dinh độc lập", "xe tăng húc đổ cổng",
+    # Hải chiến
+    "hoàng sa", "trường sa", "hải chiến hoàng sa",
+
+    # ═══ DYNASTIES & PERIODS ══════════════════════════════════
+    "nhà trần", "nhà lý", "nhà lê", "nhà nguyễn", "nhà hồ",
+    "nhà hậu lê", "nhà đinh", "tiền lê", "nhà mạc",
+    "nhà tây sơn", "tây sơn",
+    "đời trần", "đời lý", "đời lê",
+    "triều đại", "triều nguyễn", "triều lê", "triều lý", "triều trần",
+    "phong kiến", "thời kỳ bắc thuộc", "bắc thuộc",
+    "thời kỳ tự chủ", "đại việt", "đại cồ việt", "văn lang", "âu lạc",
+    "nam việt", "chăm pa", "champa", "phù nam",
+    "đàng trong", "đàng ngoài", "chúa trịnh", "chúa nguyễn",
+    "lịch sử việt nam", "lịch sử vn",
+
+    # ═══ PLACES & LANDMARKS ═══════════════════════════════════
+    "ba đình", "quảng trường ba đình", "lăng bác", "lăng chủ tịch",
+    "hoàng thành thăng long", "thăng long", "kẻ chợ",
+    "cố đô huế", "đại nội huế", "kinh thành huế",
+    "đền hùng", "phú thọ", "côn đảo", "hỏa lò",
+    "phủ chủ tịch", "nhà sàn bác hồ",
+    "địa đạo củ chi", "củ chi", "bến nhà rồng",
+    "hang pác bó", "pác bó", "tân trào",
+    "điện biên", "mường phăng",
+    "thành cổ quảng trị", "quảng trị",
+    "ngã ba đồng lộc", "đồng lộc",
+    "cầu hiền lương", "vĩ tuyến 17",
+    "cổ loa", "thành cổ loa",
+    "hoa lư", "kinh đô hoa lư",
+    "vịnh hạ long", "mỹ sơn", "phố cổ hội an",
+    "văn miếu quốc tử giám", "văn miếu",
+
+    # ═══ CONCEPTS & TERMS ═════════════════════════════════════
+    "chiến dịch", "kháng chiến", "giải phóng", "độc lập",
+    "thống nhất", "cách mạng", "khởi nghĩa",
+    "chiến thắng", "đấu tranh", "yêu nước",
+    "thực dân pháp", "thực dân", "đế quốc",
+    "phong trào", "quốc gia", "dân tộc",
+    "anh hùng", "liệt sĩ", "tử sĩ", "nghĩa quân",
+    "dân công", "bộ đội", "quân đội nhân dân",
+    "đoàn thanh niên", "hội phụ nữ",
+    "cải cách ruộng đất", "hợp tác xã",
+    "đổi mới", "xây dựng chủ nghĩa xã hội",
+    "chống quân nguyên", "chống mông",
+    "chống quân thanh", "chống quân minh",
+    "nam tiến", "mở cõi",
+}
+
+
+
+# Vietnamese LITERATURE keywords for detection
+_VIETNAM_LITERATURE_KEYWORDS = {
+    # ═══ AUTHORS & POETS ══════════════════════════════════════
+    # Classical
+    "nguyễn du", "nguyễn trãi", "hồ xuân hương", "bà huyện thanh quan",
+    "nguyễn đình chiểu", "nguyễn công trứ", "cao bá quát", "đoàn thị điểm",
+    "lê quý đôn", "nguyễn bỉnh khiêm", "trạng trình",
+    "phạm đình hổ", "lê hữu trác", "hải thượng lãn ông",
+    "đặng trần côn", "ngô thì nhậm",
+    # Modern (early 20th century)
+    "nam cao", "ngô tất tố", "vũ trọng phụng", "nguyên hồng",
+    "thạch lam", "xuân diệu", "huy cận", "chế lan viên",
+    "hàn mặc tử", "tố hữu", "nguyễn tuân", "tô hoài",
+    "nhất linh", "khái hưng", "thế lữ", "lưu trọng lư",
+    "phạm quỳnh", "nguyễn văn vĩnh", "phan khôi",
+    "tản đà", "trần tế xương", "tú xương",
+    "nguyễn khuyến", "nguyễn khắc hiếu",
+    # Modern & Contemporary
+    "nguyễn minh châu", "lê minh khuê", "bảo ninh", "nguyễn huy thiệp",
+    "dương thu hương", "ma văn kháng", "nguyễn nhật ánh",
+    "nguyễn ngọc tư", "phạm tiến duật", "thu bồn",
+    "anh đức", "nguyễn quang sáng", "sơn nam",
+    "hồ chí minh",  # as poet/writer (Nhật ký trong tù)
+    "trần đăng khoa", "phạm thị hoài",
+    # War-era writers
+    "dương thị xuân quý", "lê anh xuân", "nguyễn thi",
+
+    # ═══ LITERARY WORKS ═══════════════════════════════════════
+    # Classical
+    "truyện kiều", "kiều", "đoạn trường tân thanh",
+    "chinh phụ ngâm", "cung oán ngâm khúc", "cung oán ngâm",
+    "lục vân tiên", "văn tế nghĩa sĩ cần giuộc",
+    "bình ngô đại cáo", "hịch tướng sĩ",
+    "quốc âm thi tập", "truyền kỳ mạn lục", "hoàng lê nhất thống chí",
+    "thượng kinh ký sự", "vũ trung tùy bút",
+    "nam quốc sơn hà", "chiếu dời đô",
+    "truyện an dương vương", "sự tích trầu cau",
+    "tấm cám", "sơn tinh thủy tinh", "thánh gióng",
+    # Modern works
+    "chí phèo", "tắt đèn", "lão hạc", "số đỏ", "giông tố",
+    "vợ nhặt", "vợ chồng a phủ", "đời thừa",
+    "bước đường cùng", "bỉ vỏ", "dế mèn phiêu lưu ký",
+    "tây tiến", "việt bắc", "đất nước",
+    "nhật ký trong tù", "tuyên ngôn độc lập",
+    "rừng xà nu", "những ngôi sao xa xôi",
+    "nỗi buồn chiến tranh", "mắt biếc",
+    "tôi thấy hoa vàng trên cỏ xanh", "cho tôi xin một vé đi tuổi thơ",
+    "kính vạn hoa", "đất rừng phương nam",
+    "mùa lá rụng trong vườn", "thời xa vắng",
+
+    # ═══ LITERARY CONCEPTS & GENRES ═══════════════════════════
+    "văn học việt nam", "văn học vn", "văn học",
+    "thơ", "truyện ngắn", "tiểu thuyết", "kịch",
+    "ca dao", "tục ngữ", "thành ngữ", "câu đố",
+    "truyện cổ tích", "truyện truyền thuyết", "truyền thuyết",
+    "sử thi", "hịch", "cáo", "chiếu", "biểu",
+    "thơ lục bát", "lục bát", "song thất lục bát",
+    "thơ đường luật", "thơ tứ tuyệt", "ngũ ngôn",
+    "chữ nôm", "chữ hán", "quốc ngữ",
+    "thơ mới", "phong trào thơ mới", "tự lực văn đoàn",
+    "văn học hiện thực", "hiện thực phê phán",
+    "văn học cách mạng", "văn học kháng chiến",
+    "văn học trung đại", "văn học dân gian",
+    "văn xuôi", "phóng sự", "bút ký", "tùy bút", "hồi ký",
+    "nhà thơ", "nhà văn", "thi sĩ", "tác phẩm", "tác giả",
+    "phân tích", "bình giảng", "cảm nhận", "nghệ thuật",
+}
+
+# Vietnamese GEOGRAPHY keywords for detection
+_VIETNAM_GEOGRAPHY_KEYWORDS = {
+    # ═══ REGIONS & AREAS ══════════════════════════════════════
+    "việt nam", "bắc bộ", "trung bộ", "nam bộ",
+    "tây bắc", "đông bắc", "bắc trung bộ", "nam trung bộ",
+    "tây nguyên", "đông nam bộ", "tây nam bộ",
+    "đồng bằng sông hồng", "đồng bằng sông cửu long",
+    "duyên hải miền trung",
+
+    # ═══ PROVINCES & CITIES ═══════════════════════════════════
+    "hà nội", "hồ chí minh", "sài gòn", "đà nẵng", "hải phòng", "cần thơ",
+    "huế", "nha trang", "đà lạt", "vũng tàu", "quy nhơn", "hạ long",
+    "phú quốc", "hội an", "sapa", "sa pa", "tam đảo", "ba vì",
+    "hà giang", "cao bằng", "lạng sơn", "lào cai", "yên bái",
+    "thái nguyên", "bắc kạn", "tuyên quang", "phú thọ",
+    "sơn la", "điện biên", "lai châu", "hòa bình",
+    "quảng ninh", "bắc giang", "bắc ninh", "hải dương",
+    "hưng yên", "thái bình", "nam định", "ninh bình",
+    "hà nam", "vĩnh phúc",
+    "thanh hóa", "nghệ an", "hà tĩnh", "quảng bình",
+    "quảng trị", "thừa thiên huế",
+    "quảng nam", "quảng ngãi", "bình định", "phú yên",
+    "khánh hòa", "ninh thuận", "bình thuận",
+    "kon tum", "gia lai", "đắk lắk", "đắk nông", "lâm đồng",
+    "bình phước", "tây ninh", "bình dương", "đồng nai",
+    "bà rịa", "long an", "tiền giang", "bến tre",
+    "trà vinh", "vĩnh long", "đồng tháp", "an giang",
+    "kiên giang", "hậu giang", "sóc trăng", "bạc liêu", "cà mau",
+
+    # ═══ RIVERS ═══════════════════════════════════════════════
+    "sông hồng", "sông mê kông", "mekong", "sông cửu long",
+    "sông đà", "sông lô", "sông mã", "sông cả", "sông lam",
+    "sông hương", "sông thu bồn", "sông đồng nai",
+    "sông bạch đằng", "sông tiền", "sông hậu",
+    "sông bến hải", "sông thạch hãn",
+
+    # ═══ MOUNTAINS & HIGHLANDS ════════════════════════════════
+    "fansipan", "phan xi păng", "hoàng liên sơn",
+    "dãy trường sơn", "trường sơn", "tây nguyên",
+    "núi bà đen", "núi ngự bình", "núi bà nà",
+    "núi cấm", "tam đảo", "ba vì", "yên tử",
+    "đèo hải vân", "hải vân", "đèo ngang",
+    "đèo khau phạ", "đèo mã pí lèng", "mã pí lèng",
+    "cao nguyên", "đồi chè",
+
+    # ═══ SEAS, ISLANDS & COASTAL ══════════════════════════════
+    "biển đông", "vịnh hạ long", "vịnh bắc bộ", "vịnh thái lan",
+    "côn đảo", "phú quốc", "cát bà", "lý sơn",
+    "hoàng sa", "trường sa", "bán đảo sơn trà",
+    "bãi biển", "bờ biển", "đường bờ biển",
+    "mũi né", "mũi cà mau", "mũi đại lãnh",
+
+    # ═══ NATURAL FEATURES & HERITAGE ══════════════════════════
+    "phong nha kẻ bàng", "phong nha", "kẻ bàng",
+    "tràng an", "tam cốc", "bích động",
+    "rừng ngập mặn", "đất ngập nước", "rừng nhiệt đới",
+    "vườn quốc gia", "khu bảo tồn", "di sản thế giới",
+    "cúc phương", "cát tiên", "ba bể", "hồ ba bể",
+    "thác bản giốc", "ruộng bậc thang",
+    "hồ hoàn kiếm", "hồ tây", "hồ xuân hương",
+
+    # ═══ GEOGRAPHY CONCEPTS ═══════════════════════════════════
+    "địa lý việt nam", "địa lí việt nam", "địa lý", "địa lí",
+    "địa hình", "khí hậu", "nhiệt đới", "gió mùa",
+    "đồng bằng", "châu thổ", "bồi tụ", "phù sa",
+    "vùng kinh tế", "dân cư", "dân số",
+    "nông nghiệp", "lúa nước", "lúa gạo",
+    "biên giới", "lãnh thổ", "diện tích",
+    "hình chữ s", "bản đồ", "tọa độ",
+    "tỉnh", "thành phố", "quận", "huyện",
+    "miền bắc", "miền trung", "miền nam",
+}
+
+
+def _detect_document_context(text: str) -> dict:
+    """
+    Detect document topics: Vietnamese history, literature, geography.
+    Returns a dict with detected context flags.
+    """
+    if not text:
+        return {
+            "is_history": False, "is_vietnam_history": False,
+            "is_literature": False, "is_vietnam_literature": False,
+            "is_geography": False, "is_vietnam_geography": False,
+            "matched": [],
+        }
+
+    text_lower = text.lower()
+    preview = text_lower[:5000]  # Check first 5000 chars
+
+    # ── Vietnamese History ──
+    matched_vn_history = [kw for kw in _VIETNAM_HISTORY_KEYWORDS if kw in preview]
+    general_history_kw = {
+        "lịch sử", "history", "historical", "tiểu sử", "biography",
+        "cuộc đời", "thế kỷ", "century", "triều đại", "dynasty",
+        "chiến tranh", "war", "cách mạng", "revolution",
+    }
+    matched_gen_history = [kw for kw in general_history_kw if kw in preview]
+    is_vn_history = len(matched_vn_history) >= 2 or (
+        len(matched_vn_history) >= 1 and len(matched_gen_history) >= 1
+    )
+    is_history = is_vn_history or len(matched_gen_history) >= 2
+
+    # ── Vietnamese Literature ──
+    matched_vn_lit = [kw for kw in _VIETNAM_LITERATURE_KEYWORDS if kw in preview]
+    general_lit_kw = {
+        "văn học", "literature", "literary", "thơ", "poetry", "poem",
+        "truyện", "novel", "story", "tác phẩm", "nhà văn", "nhà thơ",
+        "phân tích", "bình giảng", "cảm nhận", "tác giả", "author",
+    }
+    matched_gen_lit = [kw for kw in general_lit_kw if kw in preview]
+    is_vn_literature = len(matched_vn_lit) >= 2 or (
+        len(matched_vn_lit) >= 1 and len(matched_gen_lit) >= 1
+    )
+    is_literature = is_vn_literature or len(matched_gen_lit) >= 2
+
+    # ── Vietnamese Geography ──
+    matched_vn_geo = [kw for kw in _VIETNAM_GEOGRAPHY_KEYWORDS if kw in preview]
+    general_geo_kw = {
+        "địa lý", "địa lí", "geography", "geographical",
+        "địa hình", "terrain", "khí hậu", "climate",
+        "sông", "river", "núi", "mountain", "biển", "sea",
+        "đồng bằng", "plain", "vùng", "region",
+    }
+    matched_gen_geo = [kw for kw in general_geo_kw if kw in preview]
+    is_vn_geography = len(matched_vn_geo) >= 3 or (
+        len(matched_vn_geo) >= 2 and len(matched_gen_geo) >= 1
+    )
+    is_geography = is_vn_geography or len(matched_gen_geo) >= 3
+
+    # Build result
+    all_matched = matched_vn_history[:3] + matched_vn_lit[:3] + matched_vn_geo[:3]
+    result = {
+        "is_history": is_history,
+        "is_vietnam_history": is_vn_history,
+        "is_literature": is_literature,
+        "is_vietnam_literature": is_vn_literature,
+        "is_geography": is_geography,
+        "is_vietnam_geography": is_vn_geography,
+        "matched": all_matched[:5],
+    }
+
+    # Logging
+    detected = []
+    if is_vn_history:
+        detected.append(f"VN History ({matched_vn_history[:3]})")
+    elif is_history:
+        detected.append(f"History ({matched_gen_history[:3]})")
+    if is_vn_literature:
+        detected.append(f"VN Literature ({matched_vn_lit[:3]})")
+    elif is_literature:
+        detected.append(f"Literature ({matched_gen_lit[:3]})")
+    if is_vn_geography:
+        detected.append(f"VN Geography ({matched_vn_geo[:3]})")
+    elif is_geography:
+        detected.append(f"Geography ({matched_gen_geo[:3]})")
+
+    if detected:
+        logger.info(f"Document context detected: {', '.join(detected)}")
+
+    return result
+
+
 async def generate_slides(
     prompt: str,
     word_content: str = "",
@@ -252,6 +608,12 @@ async def generate_slides(
 
     # Extract document topic for image keyword guidance
     document_topic = _extract_document_topic(word_content) if word_content else ""
+    doc_context = _detect_document_context(word_content) if word_content else {
+        "is_history": False, "is_vietnam_history": False,
+        "is_literature": False, "is_vietnam_literature": False,
+        "is_geography": False, "is_vietnam_geography": False,
+        "matched": [],
+    }
     if document_topic:
         logger.info(f"Document topic extracted: '{document_topic[:80]}...'")
 
@@ -352,6 +714,96 @@ async def generate_slides(
         "FORBIDDEN - NEVER use these generic words alone as image_keyword:\n"
         "person, man, woman, people, girl, boy, landscape, nature, building, city, \n"
         "field, flag, leader, soldier, office, team, sky, road, mountain\n\n"
+    )
+
+    # Add STRICT Vietnamese history rules if detected
+    if doc_context.get("is_vietnam_history"):
+        image_keyword_instruction += (
+            "⚠️ VIETNAMESE HISTORY DOCUMENT DETECTED — SPECIAL RULES APPLY:\n"
+            "This document is about VIETNAMESE HISTORY. Image keywords MUST be strictly relevant.\n\n"
+            "MANDATORY: Every image_keyword MUST include 'Vietnam' or a specific Vietnamese \n"
+            "historical name/place/event. Examples:\n"
+            "  \"Vietnam Ho Chi Minh\", \"Dien Bien Phu battle\", \"Vietnam independence ceremony\",\n"
+            "  \"Ba Dinh square Hanoi\", \"Vietnam temple heritage\", \"Hanoi old quarter\",\n"
+            "  \"Vietnam rice field countryside\", \"Hue imperial citadel\", \"Vietnam war memorial\",\n"
+            "  \"Vietnam traditional culture\", \"Thang Long Hanoi\", \"Vietnam pagoda temple\",\n"
+            "  \"Vo Nguyen Giap\", \"Vietnam revolution poster\", \"Vietnam flag red star\"\n\n"
+            "ABSOLUTELY FORBIDDEN for Vietnamese history documents:\n"
+            "- Random women/girls/models (NEVER appropriate for history content)\n"
+            "- American soldiers or US military imagery\n"
+            "- South Vietnam flag (yellow with red stripes) — this is politically sensitive\n"
+            "- Generic landscape/nature photos without Vietnamese context\n"
+            "- Any image that could be disrespectful to Vietnamese historical figures\n"
+            "- Modern city photos that are not Vietnamese\n"
+            "- Random flags from other countries\n\n"
+        )
+    elif doc_context.get("is_history"):
+        image_keyword_instruction += (
+            "HISTORY DOCUMENT DETECTED — Image keywords must be historically relevant.\n"
+            "Always include the specific historical period, person, or event name.\n"
+            "NEVER use generic keywords like 'leader', 'war', 'battle' without context.\n"
+            "Always prefix with the specific country/era: e.g., 'Vietnam revolution', not just 'revolution'.\n\n"
+        )
+
+    # Add Vietnamese LITERATURE rules if detected
+    if doc_context.get("is_vietnam_literature"):
+        image_keyword_instruction += (
+            "📚 VIETNAMESE LITERATURE DOCUMENT DETECTED — SPECIAL RULES APPLY:\n"
+            "This document is about VIETNAMESE LITERATURE. Image keywords MUST reflect \n"
+            "Vietnamese literary culture, NOT random unrelated photos.\n\n"
+            "MANDATORY: Every image_keyword MUST be related to Vietnamese culture, literature, \n"
+            "or the specific literary work/author. Examples:\n"
+            "  \"Vietnam traditional poetry\", \"Vietnamese calligraphy art\",\n"
+            "  \"Vietnam ancient book scroll\", \"Vietnamese village countryside\",\n"
+            "  \"Vietnam temple literature\", \"Vietnamese traditional painting\",\n"
+            "  \"Vietnam old scholar\", \"Vietnamese ink brush\",\n"
+            "  \"Vietnam Hanoi temple literature\", \"Vietnamese woman ao dai\",\n"
+            "  \"Vietnam rice paddy landscape\", \"Vietnamese folk art\"\n\n"
+            "For specific works, use the work's theme:\n"
+            "  Truyện Kiều → \"Vietnamese woman traditional dress\", \"Vietnam moonlight poetry\"\n"
+            "  Chí Phèo → \"Vietnamese village rural\", \"Vietnam peasant countryside\"\n"
+            "  Tắt Đèn → \"Vietnamese poor family village\", \"Vietnam rural hardship\"\n\n"
+            "FORBIDDEN for Vietnamese literature documents:\n"
+            "- Modern Western/non-Vietnamese imagery\n"
+            "- Random photos of people not in Vietnamese context\n"
+            "- Generic technology, business, or office imagery\n\n"
+        )
+    elif doc_context.get("is_literature"):
+        image_keyword_instruction += (
+            "LITERATURE DOCUMENT DETECTED — Image keywords must reflect literary themes.\n"
+            "Use keywords related to books, writing, cultural context of the literary work.\n"
+            "NEVER use generic keywords unrelated to literature or the work's setting.\n\n"
+        )
+
+    # Add Vietnamese GEOGRAPHY rules if detected
+    if doc_context.get("is_vietnam_geography"):
+        image_keyword_instruction += (
+            "🗺️ VIETNAMESE GEOGRAPHY DOCUMENT DETECTED — SPECIAL RULES APPLY:\n"
+            "This document is about VIETNAMESE GEOGRAPHY. Image keywords MUST show \n"
+            "actual Vietnamese landscapes, maps, and locations.\n\n"
+            "MANDATORY: Every image_keyword MUST include 'Vietnam' or a specific Vietnamese \n"
+            "geographic feature/location. Examples:\n"
+            "  \"Vietnam Ha Long Bay\", \"Vietnam rice terrace Sapa\",\n"
+            "  \"Vietnam Mekong Delta river\", \"Vietnam Da Lat highlands\",\n"
+            "  \"Vietnam map geography\", \"Vietnam Phong Nha cave\",\n"
+            "  \"Vietnam Ho Chi Minh City aerial\", \"Vietnam Hanoi Red River\",\n"
+            "  \"Vietnam Hue Perfume River\", \"Vietnam central highlands coffee\",\n"
+            "  \"Vietnam coastline beach\", \"Vietnam Fansipan mountain\",\n"
+            "  \"Vietnam tropical forest\", \"Vietnam floating market\"\n\n"
+            "FORBIDDEN for Vietnamese geography documents:\n"
+            "- Landscapes from other countries (especially similar Asian countries)\n"
+            "- Generic mountain/river/sea photos without Vietnamese context\n"
+            "- Random people, buildings, or objects unrelated to geography\n"
+            "- Maps of other countries\n\n"
+        )
+    elif doc_context.get("is_geography"):
+        image_keyword_instruction += (
+            "GEOGRAPHY DOCUMENT DETECTED — Image keywords must show geographic features.\n"
+            "Always include the specific country/region name with the geographic feature.\n"
+            "Use: 'Vietnam river delta', not just 'river'. Include specific place names.\n\n"
+        )
+
+    image_keyword_instruction += (
         "Response must be valid JSON. slide_number, title, content, and image_keyword are mandatory."
     )
 

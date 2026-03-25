@@ -28,15 +28,96 @@ GENERIC_KEYWORDS = {
 }
 
 
+def _detect_vietnam_topic(document_topic: str) -> str:
+    """
+    Detect which Vietnamese topic the document is about.
+    Returns: 'history', 'literature', 'geography', or '' if none detected.
+    """
+    if not document_topic:
+        return ""
+    topic_lower = document_topic.lower()
+
+    # Vietnamese history markers
+    history_markers = [
+        "lịch sử", "history", "hồ chí minh", "ho chi minh", "bác hồ",
+        "kháng chiến", "cách mạng", "giải phóng", "chiến dịch", "khởi nghĩa",
+        "triều đại", "nhà trần", "nhà lý", "nhà lê", "nhà nguyễn",
+        "trần hưng đạo", "lê lợi", "quang trung", "điện biên phủ",
+        "hai bà trưng", "võ nguyên giáp", "thực dân", "đế quốc",
+        "phong kiến", "bắc thuộc", "đại việt", "văn lang",
+    ]
+    if any(m in topic_lower for m in history_markers):
+        return "history"
+
+    # Vietnamese literature markers
+    literature_markers = [
+        "văn học", "literature", "thơ", "poetry", "truyện kiều", "kiều",
+        "nguyễn du", "nam cao", "chí phèo", "tắt đèn", "lão hạc",
+        "xuân diệu", "hàn mặc tử", "tố hữu", "hồ xuân hương",
+        "lục vân tiên", "ca dao", "tục ngữ", "truyện ngắn", "tiểu thuyết",
+        "tác phẩm", "nhà văn", "nhà thơ", "phân tích", "bình giảng",
+        "bình ngô đại cáo", "hịch tướng sĩ", "chinh phụ ngâm",
+        "vợ nhặt", "vợ chồng a phủ", "số đỏ", "dế mèn",
+        "nguyễn nhật ánh", "mắt biếc", "truyện cổ tích",
+        "lục bát", "thơ mới", "tự lực văn đoàn", "văn học dân gian",
+    ]
+    if any(m in topic_lower for m in literature_markers):
+        return "literature"
+
+    # Vietnamese geography markers
+    geography_markers = [
+        "địa lý", "địa lí", "geography", "địa hình", "khí hậu",
+        "sông hồng", "sông mê kông", "mekong", "sông cửu long",
+        "đồng bằng sông", "tây nguyên", "trường sơn", "fansipan",
+        "vịnh hạ long", "phong nha", "biển đông",
+        "bắc bộ", "trung bộ", "nam bộ",
+        "miền bắc", "miền trung", "miền nam",
+        "đồng bằng", "châu thổ", "phù sa", "lúa nước",
+        "bản đồ", "lãnh thổ", "hình chữ s",
+        "vùng kinh tế", "dân cư", "dân số",
+    ]
+    if any(m in topic_lower for m in geography_markers):
+        return "geography"
+
+    # General Vietnam reference
+    if any(m in topic_lower for m in ["việt nam", "vietnam"]):
+        return "vietnam"
+
+    return ""
+
+
+# Keywords that produce politically sensitive or irrelevant images
+_SENSITIVE_KEYWORDS = {
+    "soldier", "military", "army", "troops", "war", "battle",
+    "flag", "banner", "march", "revolution", "independence",
+}
+
+
 def _enhance_keyword(keyword: str, document_topic: str) -> str:
     """
     Enhance a generic keyword by prefixing with the document topic.
-    If the keyword is already specific, return it as-is.
+    Special handling for Vietnamese history, literature, and geography content.
     """
     if not keyword:
         return keyword
 
     words = set(keyword.lower().split())
+    vn_topic = _detect_vietnam_topic(document_topic)
+
+    # For Vietnamese topics: force "Vietnam" prefix if not present
+    if vn_topic:
+        keyword_lower = keyword.lower()
+        has_vietnam_ref = any(w in keyword_lower for w in [
+            "vietnam", "hanoi", "saigon", "hue", "ho chi minh",
+            "dien bien", "ba dinh", "thang long", "vietnamese",
+            "mekong", "ha long", "da lat", "sapa", "phong nha",
+        ])
+        if not has_vietnam_ref:
+            # Add "Vietnam" prefix for context
+            if words & (_SENSITIVE_KEYWORDS | GENERIC_KEYWORDS):
+                enhanced = f"Vietnam {keyword}"
+                logger.info(f"Vietnam {vn_topic}: enhanced '{keyword}' → '{enhanced}'")
+                return enhanced
 
     # If ALL words are generic, prefix with topic for specificity
     if words and words.issubset(GENERIC_KEYWORDS) and document_topic:
