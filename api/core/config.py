@@ -32,9 +32,9 @@ class Settings:
     IMAGES_DIR: Path = BASE_DIR / "tmp" / "images"
 
     # Document processing
-    MAX_WORD_COUNT_WITHOUT_SUMMARIZATION: int = 5000
-    SUMMARIZE_CHUNK_SIZE: int = 3000          # words per chunk for summarization
-    MAX_CONTENT_FOR_LLM: int = 8000           # safety limit: max words sent to LLM
+    MAX_WORD_COUNT_WITHOUT_SUMMARIZATION: int = 40000   # no summarization below this
+    SUMMARIZE_CHUNK_SIZE: int = 5000                    # words per chunk for summarization
+    MAX_CONTENT_FOR_LLM: int = 80000                    # safety limit: max words sent to LLM
 
     def __init__(self):
         self.TEMP_DIR.mkdir(parents=True, exist_ok=True)

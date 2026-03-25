@@ -161,13 +161,11 @@ async def process_document(
     summarize_fn: Callable[[str], Awaitable[str]],
 ) -> tuple[str, bool]:
     """
-    Process a document: read it, and apply hierarchical summarization if too large.
+    Process a document: read it, and apply light summarization only for very large files.
 
-    For documents exceeding MAX_WORD_COUNT_WITHOUT_SUMMARIZATION:
-    1. Split into chunks of SUMMARIZE_CHUNK_SIZE words
-    2. Summarize each chunk individually
-    3. If combined result still exceeds the limit, re-chunk and re-summarize (recursive)
-    4. Repeat up to MAX_SUMMARIZE_ROUNDS times
+    - Under 40,000 words: no summarization, send full content to LLM
+    - 40,000 - 50,000 words: no summarization (Gemini 2.5 Flash handles this fine)
+    - Over 50,000 words: light summarization (target 30-40% reduction)
 
     Args:
         file_path: Path to the .docx or .pdf file.
@@ -176,8 +174,6 @@ async def process_document(
     Returns:
         Tuple of (processed_content, was_summarized).
     """
-    MAX_SUMMARIZE_ROUNDS = 3
-
     file_ext = Path(file_path).suffix.lower()
     if file_ext == ".pdf":
         word_content = read_pdf(file_path)
@@ -185,70 +181,53 @@ async def process_document(
         word_content = read_docx(file_path)
 
     word_count = len(word_content.split())
-    logger.info(f"Document read: {word_count} words (limit: {settings.MAX_WORD_COUNT_WITHOUT_SUMMARIZATION})")
+    logger.info(f"Document read: {word_count} words")
 
+    # Under threshold: send full content, no summarization needed
     if word_count <= settings.MAX_WORD_COUNT_WITHOUT_SUMMARIZATION:
+        logger.info(f"Document under {settings.MAX_WORD_COUNT_WITHOUT_SUMMARIZATION} words, sending full content")
         return word_content, False
 
-    # ── Hierarchical summarization ──────────────────────────
-    current_text = word_content
+    # ── Light summarization for very large documents ─────────
+    logger.info(
+        f"Document has {word_count} words (>{settings.MAX_WORD_COUNT_WITHOUT_SUMMARIZATION}), "
+        f"applying light summarization..."
+    )
+
     chunk_size = settings.SUMMARIZE_CHUNK_SIZE
 
-    for round_num in range(1, MAX_SUMMARIZE_ROUNDS + 1):
-        current_word_count = len(current_text.split())
-        logger.info(
-            f"Summarization round {round_num}: {current_word_count} words, "
-            f"chunk_size={chunk_size}"
-        )
+    # Split into chunks
+    if file_ext == ".pdf":
+        chunks = read_big_pdf(file_path, chunk_size)
+    else:
+        chunks = read_big_docx(file_path, chunk_size)
 
-        # Split into chunks (first round uses file-based reader, subsequent use text splitter)
-        if round_num == 1:
-            if file_ext == ".pdf":
-                chunks = read_big_pdf(file_path, chunk_size)
-            else:
-                chunks = read_big_docx(file_path, chunk_size)
-        else:
-            chunks = _split_text_into_chunks(current_text, chunk_size)
+    logger.info(f"Split into {len(chunks)} chunks of ~{chunk_size} words")
 
-        logger.info(f"  → Split into {len(chunks)} chunks")
+    # Summarize each chunk (light — one round only)
+    summarized_chunks = []
+    for i, chunk in enumerate(chunks, 1):
+        chunk_words = len(chunk.split())
+        logger.info(f"  Summarizing chunk {i}/{len(chunks)} ({chunk_words} words)")
+        summary = await summarize_fn(chunk)
+        summarized_chunks.append(summary)
 
-        # Summarize each chunk
-        summarized_chunks = []
-        for i, chunk in enumerate(chunks, 1):
-            logger.debug(f"  → Summarizing chunk {i}/{len(chunks)} ({len(chunk.split())} words)")
-            summary = await summarize_fn(chunk)
-            summarized_chunks.append(summary)
+    result = "\n\n".join(summarized_chunks)
+    result_word_count = len(result.split())
+    reduction_pct = ((word_count - result_word_count) / word_count * 100)
+    logger.info(
+        f"Summarization done: {word_count} → {result_word_count} words "
+        f"({reduction_pct:.0f}% reduction)"
+    )
 
-        current_text = "\n\n".join(summarized_chunks)
-        new_word_count = len(current_text.split())
-        logger.info(
-            f"  → After round {round_num}: {new_word_count} words "
-            f"(reduced {current_word_count - new_word_count} words, "
-            f"{((current_word_count - new_word_count) / current_word_count * 100):.0f}%)"
-        )
-
-        # Check if we're within the limit
-        if new_word_count <= settings.MAX_CONTENT_FOR_LLM:
-            logger.info(f"Summarization complete after {round_num} round(s): {new_word_count} words")
-            return current_text, True
-
-        # If reduction was minimal (<20%), stop to avoid infinite loop
-        reduction_ratio = (current_word_count - new_word_count) / current_word_count
-        if reduction_ratio < 0.2:
-            logger.warning(
-                f"Summarization stalled at round {round_num} "
-                f"(only {reduction_ratio:.0%} reduction). Stopping."
-            )
-            break
-
-    # Final safety: truncate if still too large
-    final_word_count = len(current_text.split())
-    if final_word_count > settings.MAX_CONTENT_FOR_LLM:
+    # Safety truncation (unlikely but just in case)
+    if result_word_count > settings.MAX_CONTENT_FOR_LLM:
         logger.warning(
-            f"Content still {final_word_count} words after {MAX_SUMMARIZE_ROUNDS} rounds. "
+            f"Content still {result_word_count} words after summarization. "
             f"Truncating to {settings.MAX_CONTENT_FOR_LLM} words."
         )
-        words = current_text.split()
-        current_text = " ".join(words[:settings.MAX_CONTENT_FOR_LLM])
+        words = result.split()
+        result = " ".join(words[:settings.MAX_CONTENT_FOR_LLM])
 
-    return current_text, True
+    return result, True
+
