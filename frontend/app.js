@@ -56,6 +56,8 @@ const dom = {
     progressRingFill: $('#progressRingFill'),
     progressPercent: $('#progressPercent'),
     progressLabel: $('#progressLabel'),
+    genProgressFill: $('#genProgressFill'),
+    genProgressPercent: $('#genProgressPercent'),
 
     // Edit
     editInput: $('#editInput'),
@@ -240,7 +242,53 @@ async function generateSlides() {
         return;
     }
 
-    showLoading(t('loading.generating'));
+    // Generate client-side progress ID for tracking
+    const progressId = Math.random().toString(36).substring(2, 10);
+
+    showLoading('Đang tạo slides bằng AI...');
+    updateGenProgress(0);
+
+    // Simulated progress ticker: slowly increments 0→90%, decelerating
+    let simPct = 0;
+    let serverPct = 0;
+    const simTimer = setInterval(() => {
+        if (simPct < 30) {
+            simPct += Math.random() * 2 + 1;       // fast: +1~3%
+        } else if (simPct < 60) {
+            simPct += Math.random() * 1.5 + 0.5;   // medium: +0.5~2%
+        } else if (simPct < 85) {
+            simPct += Math.random() * 0.8 + 0.2;   // slow: +0.2~1%
+        } else if (simPct < 90) {
+            simPct += Math.random() * 0.3;          // crawl
+        }
+        simPct = Math.min(simPct, 90);
+        // Use the higher of simulated vs server progress
+        const displayPct = Math.round(Math.max(simPct, serverPct));
+        updateGenProgress(displayPct);
+    }, 800);
+
+    // Server progress polling (for chunked generation)
+    let polling = true;
+    const pollProgress = async () => {
+        while (polling) {
+            await new Promise(r => setTimeout(r, 2000));
+            if (!polling) break;
+            try {
+                const res = await fetch(`${API_BASE}/api/slides/progress/${progressId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.status === 'generating' || data.status === 'starting') {
+                        serverPct = data.percent;
+                        dom.loadingText.textContent = data.message || 'Đang tạo slides...';
+                    } else if (data.status === 'complete') {
+                        serverPct = 100;
+                        dom.loadingText.textContent = data.message || 'Hoàn tất!';
+                    }
+                }
+            } catch (e) { /* ignore */ }
+        }
+    };
+    pollProgress();
 
     try {
         const res = await fetch(`${API_BASE}/api/slides/generate`, {
@@ -250,8 +298,12 @@ async function generateSlides() {
                 prompt,
                 word_content: state.wordContent,
                 theme: state.selectedTheme,
+                progress_id: progressId,
             }),
         });
+
+        polling = false;
+        clearInterval(simTimer);
 
         if (!res.ok) {
             const err = await res.json();
@@ -262,16 +314,30 @@ async function generateSlides() {
         state.sessionId = data.session_id;
         state.slides = data.slides;
 
+        updateGenProgress(100);
         renderSlides();
         hideLoading();
         setStatus(t('status.ready'), 'ready');
         showToast(data.message, 'success');
 
     } catch (err) {
+        polling = false;
+        clearInterval(simTimer);
         hideLoading();
         setStatus(t('status.error'), 'error');
         showToast(`${t('toast.gen.error')} ${err.message}`, 'error');
         setTimeout(() => setStatus(t('status.ready'), 'ready'), 3000);
+    }
+}
+
+function updateGenProgress(percent) {
+    const circumference = 326.73;
+    const offset = circumference - (percent / 100) * circumference;
+    if (dom.genProgressFill) {
+        dom.genProgressFill.style.strokeDashoffset = offset;
+    }
+    if (dom.genProgressPercent) {
+        dom.genProgressPercent.textContent = `${percent}%`;
     }
 }
 
@@ -399,6 +465,9 @@ async function downloadSlides() {
 }
 
 // ── Render Slides ──────────────────────────────────────────
+let _thumbSimTimer = null;
+let _thumbSimPct = 0;
+
 function renderSlides() {
     dom.emptyState.hidden = true;
     dom.loadingState.hidden = true;
@@ -413,10 +482,30 @@ function renderSlides() {
     dom.slideImage.hidden = true;
     dom.slideLoading.hidden = false;
     updateProgressRing(0);
-    dom.progressLabel.textContent = t('loading.thumbnails') || 'Rendering slide previews...';
+    dom.progressLabel.textContent = 'Đang tải slide...';
     dom.slideTitle.textContent = state.slides[0]?.title || '';
     updateSlideCounter();
     updateNavButtons();
+
+    // Start simulated progress ticker for thumbnail loading
+    _thumbSimPct = 0;
+    if (_thumbSimTimer) clearInterval(_thumbSimTimer);
+    _thumbSimTimer = setInterval(() => {
+        if (_thumbSimPct < 25) {
+            _thumbSimPct += Math.random() * 2 + 1;
+        } else if (_thumbSimPct < 50) {
+            _thumbSimPct += Math.random() * 1.5 + 0.5;
+        } else if (_thumbSimPct < 80) {
+            _thumbSimPct += Math.random() * 0.8 + 0.2;
+        } else if (_thumbSimPct < 90) {
+            _thumbSimPct += Math.random() * 0.3;
+        }
+        _thumbSimPct = Math.min(_thumbSimPct, 90);
+        // Only update if no real data yet or sim is higher
+        if (state.slideImages.length === 0) {
+            updateProgressRing(Math.round(_thumbSimPct));
+        }
+    }, 800);
 
     // Fetch thumbnails from the backend
     fetchSlideThumbnails();
@@ -445,10 +534,11 @@ async function fetchSlideThumbnails() {
             updateNavButtons();
         }
 
-        // Still generating — keep progress ring visible with real-time percentage
+        // Still generating — use MAX of simulated and real progress
         if (data.status === 'generating') {
-            const pct = total > 0 ? Math.round((newSlides.length / total) * 100) : 0;
-            updateProgressRing(pct);
+            const realPct = total > 0 ? Math.round((newSlides.length / total) * 100) : 0;
+            const displayPct = Math.round(Math.max(_thumbSimPct, realPct));
+            updateProgressRing(displayPct);
             dom.slideLoading.hidden = false;
 
             if (newSlides.length === 0) {
@@ -461,7 +551,8 @@ async function fetchSlideThumbnails() {
             return;
         }
 
-        // All done — 100% then hide
+        // All done — stop simulated timer, show 100%
+        if (_thumbSimTimer) { clearInterval(_thumbSimTimer); _thumbSimTimer = null; }
         updateProgressRing(100);
         dom.progressLabel.textContent = `Hoàn tất ${total} slides`;
         setTimeout(() => {
@@ -472,6 +563,7 @@ async function fetchSlideThumbnails() {
 
     } catch (err) {
         console.error('Failed to fetch slide thumbnails:', err);
+        if (_thumbSimTimer) { clearInterval(_thumbSimTimer); _thumbSimTimer = null; }
         dom.progressLabel.textContent = 'Không thể tải ảnh slide';
     }
 }

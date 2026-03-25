@@ -1002,6 +1002,17 @@ body {
     color: var(--text-secondary);
 }
 
+/* Larger progress ring for generation phase */
+.progress-ring--gen {
+    width: 130px;
+    height: 130px;
+}
+
+.progress-ring--gen .progress-ring__text {
+    font-size: 24px;
+    font-weight: 800;
+}
+
 @keyframes spin {
     to {
         transform: rotate(360deg);

@@ -68,6 +68,7 @@ async def create_pptx(
     template_path: Path | str | None = None,
     output_path: Path | str | None = None,
     theme_name: str | None = None,
+    document_topic: str = "",
 ) -> Path:
     """
     Create a themed PPTX file from slide data.
@@ -81,6 +82,7 @@ async def create_pptx(
         template_path: Ignored (kept for backward compatibility).
         output_path: Where to save. Uses temp file if None.
         theme_name: Theme preset name (e.g. 'corporate_blue', 'neon_pop').
+        document_topic: Document topic for context-aware image search.
 
     Returns:
         Path to the created PPTX file.
@@ -90,7 +92,7 @@ async def create_pptx(
     from .image_service import fetch_images_for_slides
 
     # Fetch images for all slides (graceful: returns {} if no API key)
-    image_paths = await fetch_images_for_slides(slides)
+    image_paths = await fetch_images_for_slides(slides, document_topic=document_topic)
 
     # Strategy 1: Try .pptx template file from templates/ folder
     prs = None

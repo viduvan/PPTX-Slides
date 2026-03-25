@@ -24,7 +24,7 @@ class GenerateRequest(BaseModel):
     word_content: str = Field("", description="Optional document content to base slides on")
     template_name: str | None = Field(None, description="Optional template file name")
     theme: str | None = Field(None, description="Theme preset name (e.g. 'ocean', 'midnight')")
-
+    progress_id: str | None = Field(None, description="Client-generated ID for progress tracking")
 
 class EditRequest(BaseModel):
     """Request body for editing existing slides."""

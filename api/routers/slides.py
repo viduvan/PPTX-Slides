@@ -18,6 +18,7 @@ from ..models.schemas import (
     UndoRequest,
 )
 from ..services import llm_service, slide_service
+from ..services.llm_service import get_generation_progress, clear_generation_progress
 from ..services.template_builder import THEMES, AVAILABLE_THEMES, THEME_REGISTRY, THEME_CATEGORIES
 from ..services.thumbnail_generator import (
     generate_thumbnails, get_thumbnail_paths,
@@ -98,6 +99,9 @@ async def generate_slides(request: GenerateRequest):
     Generate a new set of slides from a prompt.
     Optionally provide word_content (from uploaded docx) to base the slides on.
     """
+    import uuid
+    progress_id = request.progress_id or str(uuid.uuid4())[:8]
+
     try:
         word_count = len(request.word_content.split()) if request.word_content else 0
 
@@ -109,6 +113,7 @@ async def generate_slides(request: GenerateRequest):
             result = await llm_service.generate_slides_chunked(
                 prompt=request.prompt,
                 word_content=request.word_content,
+                session_id=progress_id,
             )
         else:
             result = await llm_service.generate_slides(
@@ -117,6 +122,7 @@ async def generate_slides(request: GenerateRequest):
                 existing_slides=[],
             )
         slides = result["slides"]
+        document_topic = result.get("document_topic", "")
         # Use explicitly selected theme, or auto-detected
         theme = request.theme if request.theme and request.theme != "auto" else result.get("theme")
 
@@ -128,6 +134,10 @@ async def generate_slides(request: GenerateRequest):
             template_name=str(template_path),
         )
         session.theme = theme
+        session.document_topic = document_topic
+
+        # Clean up progress tracking
+        clear_generation_progress(progress_id)
 
         # Start thumbnail generation in background immediately
         # (gives a head start while frontend renders the response)
@@ -140,12 +150,22 @@ async def generate_slides(request: GenerateRequest):
         )
 
     except ValueError as e:
+        clear_generation_progress(progress_id)
         error_msg = _get_user_friendly_error(str(e))
         raise HTTPException(status_code=400, detail=error_msg)
     except Exception as e:
+        clear_generation_progress(progress_id)
         logger.error(f"Error generating slides: {e}")
         error_msg = _get_user_friendly_error(str(e))
         raise HTTPException(status_code=500, detail=error_msg)
+
+@router.get("/progress/{progress_id}")
+async def get_progress(progress_id: str):
+    """Get real-time progress of slide generation (for chunked generation)."""
+    progress = get_generation_progress(progress_id)
+    if progress is None:
+        return {"status": "unknown", "percent": 0, "message": ""}
+    return progress
 
 
 def _get_user_friendly_error(error_str: str) -> str:
@@ -246,6 +266,7 @@ async def download_slides(session_id: str):
             template_path=template_path,
             output_path=None,
             theme_name=session.theme,
+            document_topic=session.document_topic,
         )
 
         return FileResponse(
@@ -344,6 +365,7 @@ async def _generate_thumbnails_bg(session_id: str, session):
             template_path=template_path,
             output_path=None,
             theme_name=session.theme,
+            document_topic=session.document_topic,
         )
         await asyncio.to_thread(
             generate_session_thumbnails, session_id, output_path

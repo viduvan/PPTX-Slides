@@ -16,6 +16,19 @@ from .template_builder import AVAILABLE_THEMES
 
 logger = logging.getLogger("odin_api.llm")
 
+# ── Generation Progress Tracking ─────────────────────────────
+_generation_progress: dict[str, dict] = {}
+
+
+def get_generation_progress(session_id: str) -> dict | None:
+    """Get current generation progress for a session."""
+    return _generation_progress.get(session_id)
+
+
+def clear_generation_progress(session_id: str):
+    """Clear progress tracking for a session."""
+    _generation_progress.pop(session_id, None)
+
 
 def _get_client() -> genai.Client:
     """Get a configured Gemini client."""
@@ -180,6 +193,26 @@ def detect_theme_from_prompt(prompt: str) -> str:
     return best_theme
 
 
+def _extract_document_topic(text: str, max_words: int = 200) -> str:
+    """Extract a short topic phrase from document content for image keyword guidance."""
+    if not text:
+        return ""
+    preview = " ".join(text.split()[:max_words])
+
+    # Try to identify key subjects from the beginning of the document
+    # Common patterns: titles, headings, first paragraph
+    lines = preview.split("\n")
+    # Take the first non-empty line as potential title/subject
+    subject_line = ""
+    for line in lines:
+        stripped = line.strip()
+        if stripped and len(stripped) > 3:
+            subject_line = stripped[:100]  # cap at 100 chars
+            break
+
+    return subject_line
+
+
 async def generate_slides(
     prompt: str,
     word_content: str = "",
@@ -195,7 +228,7 @@ async def generate_slides(
         existing_slides: Optional existing slides for editing.
 
     Returns:
-        Dict with 'slides' (list of slide dicts) and 'theme' (theme name string).
+        Dict with 'slides', 'theme', and 'document_topic'.
     """
     client = _get_client()
 
@@ -216,6 +249,11 @@ async def generate_slides(
             )
             words = word_content.split()
             word_content = " ".join(words[:settings.MAX_CONTENT_FOR_LLM])
+
+    # Extract document topic for image keyword guidance
+    document_topic = _extract_document_topic(word_content) if word_content else ""
+    if document_topic:
+        logger.info(f"Document topic extracted: '{document_topic[:80]}...'")
 
     # Build the system instruction (formatting rules only, NO article content)
     system_parts = []
@@ -271,15 +309,53 @@ async def generate_slides(
     )
     system_parts.append(slide_format_instruction)
 
-    system_parts.append(
+    # Build image keyword instruction with document-specific context
+    image_keyword_instruction = (
         "LANGUAGE RULE: The title and content of each slide MUST be written in the SAME language "
         "as the input article. If the article is in Vietnamese, write slides in Vietnamese. "
         "If the article is in English, write slides in English. "
         "ONLY the image_keyword field should always be in English.\n\n"
-        "The narration field should be left empty unless explicitly requested. "
-        "The image_keyword field MUST contain 1-2 simple English words for a relevant photo. "
+        "The narration field should be left empty unless explicitly requested.\n\n"
+    )
+
+    # Add topic-aware image keyword rules
+    image_keyword_instruction += (
+        "IMAGE_KEYWORD RULES (CRITICAL - READ CAREFULLY):\n"
+        "The image_keyword field is used to search stock photos on Pixabay. "
+        "BAD keywords will result in COMPLETELY WRONG images on the slides.\n\n"
+        "Rules:\n"
+        "- Each image_keyword MUST be 2-4 specific English words directly related to the slide content\n"
+        "- MUST include the main subject/person/topic name when applicable\n"
+        "- Be VERY SPECIFIC - generic words return random unrelated photos\n"
+    )
+
+    # Add document-specific context if available
+    if document_topic:
+        image_keyword_instruction += (
+            f"\nDOCUMENT CONTEXT: This document is about: \"{document_topic}\"\n"
+            "ALL image_keyword values MUST be relevant to this specific topic.\n"
+            "Include the main subject name in most image_keyword values.\n\n"
+        )
+
+    image_keyword_instruction += (
+        "Format: \"{main subject} {specific detail}\"\n"
+        "Examples of GOOD vs BAD image_keyword values:\n"
+        "  For a document about Ho Chi Minh:\n"
+        "    GOOD: \"Ho Chi Minh\", \"Vietnam independence\", \"Hanoi Vietnam\", \"Vietnam revolution\"\n"
+        "    BAD: \"leader\", \"man\", \"flag\", \"woman\", \"field\", \"soldier\"\n"
+        "  For a document about Climate Change:\n"
+        "    GOOD: \"global warming earth\", \"carbon emission factory\", \"solar energy panel\"\n"
+        "    BAD: \"nature\", \"world\", \"green\", \"sky\"\n"
+        "  For a document about Machine Learning:\n"
+        "    GOOD: \"artificial intelligence brain\", \"neural network diagram\", \"data analysis chart\"\n"
+        "    BAD: \"computer\", \"technology\", \"screen\"\n\n"
+        "FORBIDDEN - NEVER use these generic words alone as image_keyword:\n"
+        "person, man, woman, people, girl, boy, landscape, nature, building, city, \n"
+        "field, flag, leader, soldier, office, team, sky, road, mountain\n\n"
         "Response must be valid JSON. slide_number, title, content, and image_keyword are mandatory."
     )
+
+    system_parts.append(image_keyword_instruction)
 
     system_instruction = "\n\n".join(system_parts)
 
@@ -321,7 +397,11 @@ async def generate_slides(
             if "narration" not in slide:
                 slide["narration"] = ""
 
-        return {"slides": parsed, "theme": detect_theme_from_prompt(prompt)}
+        return {
+            "slides": parsed,
+            "theme": detect_theme_from_prompt(prompt),
+            "document_topic": document_topic,
+        }
 
     except json.JSONDecodeError as e:
         logger.error(f"JSON parse error: {e}")
@@ -351,6 +431,7 @@ def _process_content(input_data) -> str:
 async def generate_slides_chunked(
     prompt: str,
     word_content: str,
+    session_id: str = "",
 ) -> dict:
     """
     Generate slides from a large document by splitting it into chunks
@@ -362,12 +443,18 @@ async def generate_slides_chunked(
     Args:
         prompt: User's instruction for slide creation.
         word_content: Large document content.
+        session_id: Session ID for progress tracking.
 
     Returns:
         Dict with 'slides' (list of slide dicts) and 'theme' (theme name string).
     """
     import asyncio
     from .document_service import _split_text_into_chunks
+
+    # Extract document topic from the FULL document (before chunking)
+    document_topic = _extract_document_topic(word_content)
+    if document_topic:
+        logger.info(f"Chunked generation - document topic: '{document_topic[:80]}...'")
 
     # Dynamic chunk size based on document length
     total_words = len(word_content.split())
@@ -386,12 +473,33 @@ async def generate_slides_chunked(
         f"{total_chunks} chunks of ~{chunk_size} words"
     )
 
+    # Initialize progress tracking
+    if session_id:
+        _generation_progress[session_id] = {
+            "current_chunk": 0,
+            "total_chunks": total_chunks,
+            "percent": 0,
+            "status": "starting",
+            "message": f"Đang chuẩn bị tạo slides từ {total_chunks} phần...",
+        }
+
     all_slides = []
     slide_offset = 0
 
     for i, chunk in enumerate(chunks, 1):
         chunk_words = len(chunk.split())
         logger.info(f"Generating slides for chunk {i}/{total_chunks} ({chunk_words} words)")
+
+        # Update progress
+        if session_id:
+            pct = int(((i - 1) / total_chunks) * 100)
+            _generation_progress[session_id] = {
+                "current_chunk": i,
+                "total_chunks": total_chunks,
+                "percent": pct,
+                "status": "generating",
+                "message": f"Đang tạo slides phần {i}/{total_chunks}...",
+            }
 
         # Build context about already-generated slides to prevent duplication
         existing_titles_note = ""
@@ -464,12 +572,28 @@ async def generate_slides_chunked(
                 continue
 
     if not all_slides:
+        if session_id:
+            clear_generation_progress(session_id)
         raise ValueError("No slides were generated from any chunk")
 
     # Final renumber from 1
     for i, slide in enumerate(all_slides, 1):
         slide["slide_number"] = float(i)
 
+    # Mark complete
+    if session_id:
+        _generation_progress[session_id] = {
+            "current_chunk": total_chunks,
+            "total_chunks": total_chunks,
+            "percent": 100,
+            "status": "complete",
+            "message": f"Hoàn tất tạo {len(all_slides)} slides",
+        }
+
     logger.info(f"Chunked generation complete: {len(all_slides)} total slides from {total_chunks} chunks")
-    return {"slides": all_slides, "theme": detect_theme_from_prompt(prompt)}
+    return {
+        "slides": all_slides,
+        "theme": detect_theme_from_prompt(prompt),
+        "document_topic": document_topic,
+    }
 
