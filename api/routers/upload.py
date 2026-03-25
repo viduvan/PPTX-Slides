@@ -45,7 +45,7 @@ async def _process_upload(file: UploadFile, allowed_exts: set[str]) -> UploadRes
     if ext not in allowed_exts:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type '{ext}'. Supported: {', '.join(sorted(allowed_exts))}"
+            detail=f"Định dạng file '{ext}' không được hỗ trợ. Vui lòng sử dụng: {', '.join(sorted(allowed_exts))}"
         )
 
     # Save uploaded file to temp directory
@@ -55,7 +55,7 @@ async def _process_upload(file: UploadFile, allowed_exts: set[str]) -> UploadRes
             shutil.copyfileobj(file.file, f)
     except Exception as e:
         logger.error(f"Error saving uploaded file: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to save uploaded file: {e}")
+        raise HTTPException(status_code=500, detail="Không thể lưu file. Vui lòng thử lại.")
 
     try:
         # Process the document (read + optional summarization)
@@ -78,7 +78,14 @@ async def _process_upload(file: UploadFile, allowed_exts: set[str]) -> UploadRes
 
     except Exception as e:
         logger.error(f"Error processing document: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to process document: {e}")
+        error_str = str(e).lower()
+        if "429" in error_str or "resource_exhausted" in error_str or "quota" in error_str:
+            msg = "Đã hết lượt sử dụng AI trong ngày. Vui lòng thử lại vào ngày mai."
+        elif "503" in error_str or "unavailable" in error_str:
+            msg = "Hệ thống AI đang quá tải. Vui lòng thử lại sau vài phút."
+        else:
+            msg = "Không thể xử lý file. Vui lòng kiểm tra file và thử lại."
+        raise HTTPException(status_code=500, detail=msg)
 
     finally:
         # Clean up temp file

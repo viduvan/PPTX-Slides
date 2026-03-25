@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=10">
+    <link rel="stylesheet" href="/static/style.css?v=14">
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 </head>
 
@@ -254,7 +254,7 @@
                 <p class="loading-state__text" id="loadingText" data-i18n="loading.generating">Generating slides with AI...</p>
             </div>
 
-            <!-- Slide Preview Area -->
+            <!-- Slide Preview Area — Carousel Viewer -->
             <div class="slides-area" id="slidesArea" hidden>
                 <div class="slides-header">
                     <h2 class="slides-header__title">
@@ -281,11 +281,35 @@
                     </div>
                 </div>
 
-                <!-- Slide Cards Grid -->
-                <div class="slides-grid" id="slidesGrid"></div>
+                <!-- Carousel Slide Viewer -->
+                <div class="slide-viewer" id="slideViewer">
+                    <div class="slide-viewer__counter" id="slideCounter">Slide 1 of 1</div>
+                    <div class="slide-viewer__stage">
+                        <button class="slide-viewer__nav slide-viewer__nav--prev" id="prevSlideBtn" title="Previous slide">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="15 18 9 12 15 6" />
+                            </svg>
+                        </button>
+                        <div class="slide-viewer__frame" id="slideFrame">
+                            <img class="slide-viewer__image" id="slideImage" src="" alt="Slide preview" />
+                            <div class="slide-viewer__loading" id="slideLoading">
+                                <div class="loading-spinner"></div>
+                                <p data-i18n="loading.thumbnails">Rendering slide previews...</p>
+                            </div>
+                        </div>
+                        <button class="slide-viewer__nav slide-viewer__nav--next" id="nextSlideBtn" title="Next slide">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="slide-viewer__info" id="slideInfo">
+                        <h3 class="slide-viewer__slide-title" id="slideTitle"></h3>
+                    </div>
+                </div>
 
-                <!-- Edit Panel -->
-                <div class="edit-panel">
+                <!-- Edit Panel (hidden - disabled to save quota) -->
+                <div class="edit-panel" hidden style="display:none">
                     <div class="edit-panel__inner">
                         <textarea class="edit-input" id="editInput"
                             data-i18n-placeholder="placeholder.edit"
@@ -304,7 +328,7 @@
         </main>
     </div>
 
-    <!-- ═══ Slide Detail Modal ═══ -->
+    <!-- ═══ Slide Detail Modal (Editable) ═══ -->
     <div class="modal-overlay" id="slideModal" hidden>
         <div class="modal">
             <div class="modal__header">
@@ -314,16 +338,27 @@
             <div class="modal__body">
                 <div class="modal__field">
                     <label data-i18n="modal.label.title">Title</label>
-                    <div class="modal__content" id="modalSlideTitle"></div>
+                    <textarea class="modal__input" id="modalSlideTitle" rows="2"></textarea>
                 </div>
                 <div class="modal__field">
                     <label data-i18n="modal.label.content">Content</label>
-                    <div class="modal__content modal__content--large" id="modalSlideContent"></div>
+                    <textarea class="modal__input modal__input--large" id="modalSlideContent" rows="10"></textarea>
                 </div>
                 <div class="modal__field" id="modalNarrationField">
                     <label data-i18n="modal.label.narration">Narration / Notes</label>
-                    <div class="modal__content" id="modalSlideNarration"></div>
+                    <textarea class="modal__input" id="modalSlideNarration" rows="3"></textarea>
                 </div>
+            </div>
+            <div class="modal__footer">
+                <button class="btn btn--ghost" id="modalCancelBtn">
+                    <span data-i18n="btn.cancel">Cancel</span>
+                </button>
+                <button class="btn btn--primary" id="modalSaveBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    <span data-i18n="btn.save">Save</span>
+                </button>
             </div>
         </div>
     </div>
@@ -332,7 +367,7 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="/static/i18n.js?v=3"></script>
-    <script src="/static/app.js?v=8"></script>
+    <script src="/static/app.js?v=12"></script>
 </body>
 
 </html>

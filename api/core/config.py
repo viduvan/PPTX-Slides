@@ -35,7 +35,6 @@ class Settings:
     MAX_WORD_COUNT_WITHOUT_SUMMARIZATION: int = 100000  # no summarization below this
     SUMMARIZE_CHUNK_SIZE: int = 20000                   # words per chunk for summarization
     MAX_CONTENT_FOR_LLM: int = 80000                    # safety limit: max words sent to LLM
-    CHUNK_SIZE_FOR_SLIDE_GEN: int = 25000               # words per chunk for chunked slide generation
     CHUNKED_SLIDE_THRESHOLD: int = 20000                # use chunked generation above this word count
 
     def __init__(self):

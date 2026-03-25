@@ -369,7 +369,15 @@ async def generate_slides_chunked(
     import asyncio
     from .document_service import _split_text_into_chunks
 
-    chunk_size = settings.CHUNK_SIZE_FOR_SLIDE_GEN
+    # Dynamic chunk size based on document length
+    total_words = len(word_content.split())
+    if total_words <= 40000:
+        chunk_size = 10000
+    elif total_words <= 70000:
+        chunk_size = 17000
+    else:
+        chunk_size = 25000
+
     chunks = _split_text_into_chunks(word_content, chunk_size)
     total_chunks = len(chunks)
 

@@ -12,6 +12,9 @@ const API_BASE = window.location.origin;
 const state = {
     sessionId: null,
     slides: [],
+    slideImages: [],
+    currentSlideIndex: 0,
+    editingSlideIndex: -1,
     wordContent: '',
     isLoading: false,
     selectedTheme: 'auto',
@@ -40,7 +43,16 @@ const dom = {
     loadingText: $('#loadingText'),
     slidesArea: $('#slidesArea'),
     slideCount: $('#slideCount'),
-    slidesGrid: $('#slidesGrid'),
+
+    // Carousel viewer
+    slideViewer: $('#slideViewer'),
+    slideCounter: $('#slideCounter'),
+    slideImage: $('#slideImage'),
+    slideLoading: $('#slideLoading'),
+    slideFrame: $('#slideFrame'),
+    slideTitle: $('#slideTitle'),
+    prevSlideBtn: $('#prevSlideBtn'),
+    nextSlideBtn: $('#nextSlideBtn'),
 
     // Edit
     editInput: $('#editInput'),
@@ -56,6 +68,8 @@ const dom = {
     modalSlideNarration: $('#modalSlideNarration'),
     modalNarrationField: $('#modalNarrationField'),
     modalClose: $('#modalClose'),
+    modalSaveBtn: $('#modalSaveBtn'),
+    modalCancelBtn: $('#modalCancelBtn'),
 
     // Status
     statusBadge: $('#statusBadge'),
@@ -87,6 +101,7 @@ function init() {
     setupEdit();
     setupModal();
     setupKeyboard();
+    setupCarousel();
     setupThemePreview();
     loadThemes();
 }
@@ -387,63 +402,198 @@ function renderSlides() {
     dom.slidesArea.hidden = false;
     dom.slideCount.textContent = state.slides.length;
 
-    dom.slidesGrid.innerHTML = '';
+    // Reset carousel state
+    state.currentSlideIndex = 0;
+    state.slideImages = [];
 
-    state.slides.forEach((slide, index) => {
-        const card = document.createElement('div');
-        card.className = 'slide-card';
-        card.style.animationDelay = `${index * 60}ms`;
+    // Show loading state in the viewer
+    dom.slideImage.hidden = true;
+    dom.slideLoading.hidden = false;
+    dom.slideTitle.textContent = state.slides[0]?.title || '';
+    updateSlideCounter();
+    updateNavButtons();
 
-        card.innerHTML = `
-            <div class="slide-card__header">
-                <span class="slide-card__number">${t('slide.label')} ${slide.slide_number}</span>
-                <div class="slide-card__actions">
-                    <button class="btn-icon" title="${t('slide.view')}">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                            <circle cx="12" cy="12" r="3"/>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-            <div class="slide-card__body">
-                <div class="slide-card__title">${escapeHtml(slide.title)}</div>
-                <div class="slide-card__content">${escapeHtml(slide.content)}</div>
-            </div>
-        `;
+    // Fetch thumbnails from the backend
+    fetchSlideThumbnails();
+}
 
-        card.addEventListener('click', () => openSlideModal(slide));
-        dom.slidesGrid.appendChild(card);
+async function fetchSlideThumbnails() {
+    if (!state.sessionId) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/slides/${state.sessionId}/thumbnails`);
+        if (!res.ok) throw new Error('Thumbnail fetch failed');
+
+        const data = await res.json();
+        const newSlides = data.slides || [];
+        const total = data.total || state.slides.length;
+        const wasEmpty = state.slideImages.length === 0;
+
+        // Update available thumbnails
+        state.slideImages = newSlides;
+
+        // Show the first available slide as soon as it arrives
+        if (newSlides.length > 0) {
+            const idx = state.currentSlideIndex;
+            if (idx < newSlides.length) {
+                dom.slideImage.src = newSlides[idx].image_url;
+                dom.slideImage.hidden = false;
+                dom.slideLoading.hidden = true;
+            } else if (wasEmpty) {
+                // First load — show slide 1
+                dom.slideImage.src = newSlides[0].image_url;
+                dom.slideImage.hidden = false;
+                dom.slideLoading.hidden = true;
+            }
+            updateNavButtons();
+        }
+
+        // Still generating — show progress and poll again
+        if (data.status === 'generating') {
+            if (newSlides.length === 0) {
+                dom.slideLoading.querySelector('p').textContent =
+                    t('loading.thumbnails') || 'Rendering slide previews...';
+            } else {
+                dom.slideLoading.hidden = true;
+                // Update counter to show rendering progress
+                dom.slideCounter.textContent =
+                    `${t('slide.label')} ${state.currentSlideIndex + 1} / ${state.slides.length}  ⟨${t('loading.rendering') || 'Rendering'} ${newSlides.length}/${total}⟩`;
+            }
+            setTimeout(() => fetchSlideThumbnails(), 2000);
+            return;
+        }
+
+        // All done — update counter to final
+        updateSlideCounter();
+        updateNavButtons();
+
+    } catch (err) {
+        console.error('Failed to fetch slide thumbnails:', err);
+        dom.slideLoading.querySelector('p').textContent =
+            t('loading.thumbnails.fail') || 'Could not generate slide previews';
+    }
+}
+
+// ── Carousel Navigation ─────────────────────────────────────
+function setupCarousel() {
+    dom.prevSlideBtn.addEventListener('click', prevSlide);
+    dom.nextSlideBtn.addEventListener('click', nextSlide);
+
+    // Click on slide image to open detail modal
+    dom.slideImage.addEventListener('click', () => {
+        if (state.slides[state.currentSlideIndex]) {
+            openSlideModal(state.slides[state.currentSlideIndex]);
+        }
     });
 }
 
-// ── Modal ──────────────────────────────────────────────────
+function goToSlide(index) {
+    if (index < 0 || index >= state.slides.length) return;
+    state.currentSlideIndex = index;
+
+    // Update image
+    if (state.slideImages.length > index) {
+        dom.slideImage.src = state.slideImages[index].image_url;
+        dom.slideImage.hidden = false;
+        dom.slideLoading.hidden = true;
+    }
+
+    // Update title and counter
+    dom.slideTitle.textContent = state.slides[index]?.title || '';
+    updateSlideCounter();
+    updateNavButtons();
+}
+
+function nextSlide() {
+    goToSlide(state.currentSlideIndex + 1);
+}
+
+function prevSlide() {
+    goToSlide(state.currentSlideIndex - 1);
+}
+
+function updateSlideCounter() {
+    const current = state.currentSlideIndex + 1;
+    const total = state.slides.length;
+    dom.slideCounter.textContent = `${t('slide.label')} ${current} / ${total}`;
+}
+
+function updateNavButtons() {
+    dom.prevSlideBtn.disabled = state.currentSlideIndex <= 0;
+    // Limit forward to slides with thumbnails available
+    const maxIndex = Math.min(state.slides.length, state.slideImages.length) - 1;
+    dom.nextSlideBtn.disabled = state.currentSlideIndex >= maxIndex;
+}
+
+// ── Modal (Editable) ──────────────────────────────────────
 function setupModal() {
     dom.modalClose.addEventListener('click', closeModal);
+    dom.modalCancelBtn.addEventListener('click', closeModal);
+    dom.modalSaveBtn.addEventListener('click', saveSlideEdit);
     dom.slideModal.addEventListener('click', (e) => {
         if (e.target === dom.slideModal) closeModal();
     });
 }
 
 function openSlideModal(slide) {
+    state.editingSlideIndex = state.currentSlideIndex;
     dom.modalTitle.textContent = `${t('slide.label')} ${slide.slide_number}`;
-    dom.modalSlideTitle.textContent = slide.title || t('modal.no.title');
-    dom.modalSlideContent.textContent = slide.content || t('modal.no.content');
+    dom.modalSlideTitle.value = slide.title || '';
+    dom.modalSlideContent.value = slide.content || '';
 
     if (slide.narration && slide.narration.trim()) {
         dom.modalNarrationField.hidden = false;
-        dom.modalSlideNarration.textContent = slide.narration;
+        dom.modalSlideNarration.value = slide.narration;
     } else {
-        dom.modalNarrationField.hidden = true;
+        dom.modalNarrationField.hidden = false;
+        dom.modalSlideNarration.value = slide.narration || '';
     }
 
     dom.slideModal.hidden = false;
     document.body.style.overflow = 'hidden';
+    // Focus the title input
+    dom.modalSlideTitle.focus();
 }
 
 function closeModal() {
     dom.slideModal.hidden = true;
     document.body.style.overflow = '';
+    state.editingSlideIndex = -1;
+}
+
+async function saveSlideEdit() {
+    const idx = state.editingSlideIndex;
+    if (idx < 0 || idx >= state.slides.length) return;
+
+    // Update local state
+    state.slides[idx].title = dom.modalSlideTitle.value.trim();
+    state.slides[idx].content = dom.modalSlideContent.value.trim();
+    state.slides[idx].narration = dom.modalSlideNarration.value.trim();
+
+    // Update the slide title shown below the carousel
+    dom.slideTitle.textContent = state.slides[idx].title;
+
+    closeModal();
+    showToast(t('toast.slide.saved') || 'Slide saved', 'success');
+
+    // Sync to backend (no LLM call — just data update)
+    if (state.sessionId) {
+        try {
+            await fetch(`${API_BASE}/api/slides/${state.sessionId}/slides`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ slides: state.slides }),
+            });
+
+            // Clear cached thumbnails and re-generate
+            state.slideImages = [];
+            dom.slideImage.hidden = true;
+            dom.slideLoading.hidden = false;
+            fetchSlideThumbnails();
+        } catch (err) {
+            console.error('Failed to sync slide edit:', err);
+        }
+    }
 }
 
 // ── Keyboard Shortcuts ─────────────────────────────────────
@@ -451,6 +601,16 @@ function setupKeyboard() {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             if (!dom.slideModal.hidden) closeModal();
+        }
+        // Arrow key navigation for carousel (only when slides are visible and modal is closed)
+        if (dom.slideModal.hidden && !dom.slidesArea.hidden) {
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                prevSlide();
+            } else if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                nextSlide();
+            }
         }
     });
 }
