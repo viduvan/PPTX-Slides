@@ -129,6 +129,10 @@ async def generate_slides(request: GenerateRequest):
         )
         session.theme = theme
 
+        # Start thumbnail generation in background immediately
+        # (gives a head start while frontend renders the response)
+        _start_thumbnail_generation(session.session_id, session)
+
         return GenerateResponse(
             session_id=session.session_id,
             slides=[SlideData(**s) for s in slides],

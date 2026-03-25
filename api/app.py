@@ -132,10 +132,17 @@ if FRONTEND_DIR.exists():
 
 @app.get("/", response_class=HTMLResponse, tags=["Frontend"])
 async def serve_frontend():
-    """Serve the frontend UI."""
+    """Serve the frontend UI (no-cache to ensure latest HTML is always delivered)."""
     index_path = FRONTEND_DIR / "index.html"
     if index_path.exists():
-        return HTMLResponse(content=index_path.read_text(encoding="utf-8"))
+        return HTMLResponse(
+            content=index_path.read_text(encoding="utf-8"),
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
     return HTMLResponse(
         content="<h1>PPTX-Slides API</h1><p>Frontend not found. Visit <a href='/docs'>/docs</a> for API docs.</p>"
     )

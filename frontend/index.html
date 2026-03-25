@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css?v=15">
+    <link rel="stylesheet" href="/static/style.css?v=19">
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 </head>
 
@@ -31,19 +31,21 @@
             </div>
             <!-- Theme Mode Toggle -->
             <button class="theme-toggle" id="themeToggle" title="Toggle light/dark mode">
-                <svg class="theme-toggle__icon theme-toggle__sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="5"/>
-                    <line x1="12" y1="1" x2="12" y2="3"/>
-                    <line x1="12" y1="21" x2="12" y2="23"/>
-                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                    <line x1="1" y1="12" x2="3" y2="12"/>
-                    <line x1="21" y1="12" x2="23" y2="12"/>
-                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                <svg class="theme-toggle__icon theme-toggle__sun" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="5" />
+                    <line x1="12" y1="1" x2="12" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="23" />
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                    <line x1="1" y1="12" x2="3" y2="12" />
+                    <line x1="21" y1="12" x2="23" y2="12" />
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
                 </svg>
-                <svg class="theme-toggle__icon theme-toggle__moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                <svg class="theme-toggle__icon theme-toggle__moon" width="18" height="18" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
                 </svg>
             </button>
             <div class="topnav__status" id="statusBadge">
@@ -74,7 +76,8 @@
                         <polyline points="17 8 12 3 7 8" />
                         <line x1="12" y1="3" x2="12" y2="15" />
                     </svg>
-                    <p class="upload-zone__text"><span data-i18n="upload.dragdrop">Drag & drop</span> <strong>.docx</strong> <span data-i18n="upload.dragdrop.filetypes">or .pdf here</span></p>
+                    <p class="upload-zone__text"><span data-i18n="upload.dragdrop">Drag & drop</span>
+                        <strong>.docx</strong> <span data-i18n="upload.dragdrop.filetypes">or .pdf here</span></p>
                     <p class="upload-zone__hint" data-i18n="upload.hint">or click to browse</p>
                 </div>
                 <div class="upload-status" id="uploadStatus" hidden>
@@ -85,7 +88,8 @@
                             <polyline points="14 2 14 8 20 8" />
                         </svg>
                         <span id="fileName">document.docx</span>
-                        <button class="btn-icon" id="removeFile" data-i18n-title="upload.remove.title" title="Remove file">×</button>
+                        <button class="btn-icon" id="removeFile" data-i18n-title="upload.remove.title"
+                            title="Remove file">×</button>
                     </div>
                     <p class="upload-status__info" id="uploadInfo"></p>
                 </div>
@@ -99,8 +103,7 @@
                     </svg>
                     <span data-i18n="sidebar.prompt">Prompt</span>
                 </h3>
-                <textarea class="prompt-input" id="promptInput"
-                    data-i18n-placeholder="placeholder.prompt"
+                <textarea class="prompt-input" id="promptInput" data-i18n-placeholder="placeholder.prompt"
                     placeholder="Describe your presentation...&#10;&#10;E.g.: Create 5 slides about the future of AI in healthcare, including an intro, key technologies, challenges, case studies, and conclusion."></textarea>
             </div>
 
@@ -152,7 +155,9 @@
                     </svg>
                 </div>
                 <h2 class="empty-state__title" data-i18n="empty.title">Create Your Presentation</h2>
-                <p class="empty-state__desc"><span data-i18n="empty.desc">Upload a document or write a prompt to get started.</span><br><span data-i18n="empty.desc2">AI will generate beautiful slides for you.</span></p>
+                <p class="empty-state__desc"><span data-i18n="empty.desc">Upload a document or write a prompt to get
+                        started.</span><br><span data-i18n="empty.desc2">AI will generate beautiful slides for
+                        you.</span></p>
 
                 <!-- Usage Guide -->
                 <div class="usage-guide" id="usageGuide">
@@ -162,24 +167,29 @@
                         <div class="guide-card">
                             <div class="guide-card__header">
                                 <span class="guide-card__icon">📄</span>
-                                <h4 class="guide-card__title" data-i18n="guide.case1.title">From Document (DOCX/PDF)</h4>
+                                <h4 class="guide-card__title" data-i18n="guide.case1.title">From Document (DOCX/PDF)
+                                </h4>
                             </div>
                             <ol class="guide-card__steps">
                                 <li>
                                     <span class="guide-step__icon">⬆️</span>
-                                    <span data-i18n="guide.case1.step1">Upload your .docx or .pdf file using the upload area on the left sidebar</span>
+                                    <span data-i18n="guide.case1.step1">Upload your .docx or .pdf file using the upload
+                                        area on the left sidebar</span>
                                 </li>
                                 <li>
                                     <span class="guide-step__icon">✏️</span>
-                                    <span data-i18n="guide.case1.step2">Write a prompt to guide the AI (e.g., "Create slides from this document" or "Summarize into 8 slides")</span>
+                                    <span data-i18n="guide.case1.step2">Write a prompt to guide the AI (e.g., "Create
+                                        slides from this document" or "Summarize into 8 slides")</span>
                                 </li>
                                 <li>
                                     <span class="guide-step__icon">🎨</span>
-                                    <span data-i18n="guide.case1.step3">Choose a theme or leave it as "Auto" for AI to pick the best one</span>
+                                    <span data-i18n="guide.case1.step3">Choose a theme or leave it as "Auto" for AI to
+                                        pick the best one</span>
                                 </li>
                                 <li>
                                     <span class="guide-step__icon">⚡</span>
-                                    <span data-i18n="guide.case1.step4">Click "Generate Slides" and wait for AI to create your presentation</span>
+                                    <span data-i18n="guide.case1.step4">Click "Generate Slides" and wait for AI to
+                                        create your presentation</span>
                                 </li>
                             </ol>
                         </div>
@@ -188,31 +198,38 @@
                         <div class="guide-card">
                             <div class="guide-card__header">
                                 <span class="guide-card__icon">💬</span>
-                                <h4 class="guide-card__title" data-i18n="guide.case2.title">From Prompt (No Document)</h4>
+                                <h4 class="guide-card__title" data-i18n="guide.case2.title">From Prompt (No Document)
+                                </h4>
                             </div>
                             <ol class="guide-card__steps">
                                 <li>
                                     <span class="guide-step__icon">✏️</span>
-                                    <span data-i18n="guide.case2.step1">Write a detailed prompt describing your presentation topic and structure</span>
+                                    <span data-i18n="guide.case2.step1">Write a detailed prompt describing your
+                                        presentation topic and structure</span>
                                 </li>
                                 <li>
                                     <span class="guide-step__icon">💡</span>
-                                    <span data-i18n="guide.case2.step2">Example: "Create 6 slides about Digital Marketing trends 2026 with intro, key trends, strategies, tools, case study, and conclusion"</span>
+                                    <span data-i18n="guide.case2.step2">Example: "Create 6 slides about Digital
+                                        Marketing trends 2026 with intro, key trends, strategies, tools, case study, and
+                                        conclusion"</span>
                                 </li>
                                 <li>
                                     <span class="guide-step__icon">🎨</span>
-                                    <span data-i18n="guide.case2.step3">Choose a theme or leave it as "Auto" for AI to pick the best one</span>
+                                    <span data-i18n="guide.case2.step3">Choose a theme or leave it as "Auto" for AI to
+                                        pick the best one</span>
                                 </li>
                                 <li>
                                     <span class="guide-step__icon">⚡</span>
-                                    <span data-i18n="guide.case2.step4">Click "Generate Slides" — AI will create content from scratch based on your prompt</span>
+                                    <span data-i18n="guide.case2.step4">Click "Generate Slides" — AI will create content
+                                        from scratch based on your prompt</span>
                                 </li>
                             </ol>
                         </div>
                     </div>
                     <p class="usage-guide__tip">
                         <span class="guide-tip__icon">💡</span>
-                        <span data-i18n="guide.tip">Tip: After generating, you can edit individual slides, undo changes, and download as PPTX.</span>
+                        <span data-i18n="guide.tip">Tip: After generating, you can edit individual slides, undo changes,
+                            and download as PPTX.</span>
                     </p>
                 </div>
             </div>
@@ -229,13 +246,15 @@
                     </div>
                     <div class="theme-preview__actions">
                         <button class="btn btn--primary" id="previewSelectBtn">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
                                 <polyline points="20 6 9 17 4 12" />
                             </svg>
                             <span data-i18n="preview.select">Use This Theme</span>
                         </button>
                         <button class="btn btn--ghost" id="previewCloseBtn">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
                                 <line x1="18" y1="6" x2="6" y2="18" />
                                 <line x1="6" y1="6" x2="18" y2="18" />
                             </svg>
@@ -251,7 +270,8 @@
             <!-- Loading State -->
             <div class="loading-state" id="loadingState" hidden>
                 <div class="loading-spinner"></div>
-                <p class="loading-state__text" id="loadingText" data-i18n="loading.generating">Generating slides with AI...</p>
+                <p class="loading-state__text" id="loadingText" data-i18n="loading.generating">Generating slides with
+                    AI...</p>
             </div>
 
             <!-- Slide Preview Area — Carousel Viewer -->
@@ -285,20 +305,30 @@
                 <div class="slide-viewer" id="slideViewer">
                     <div class="slide-viewer__counter" id="slideCounter">Slide 1 of 1</div>
                     <div class="slide-viewer__stage">
-                        <button class="slide-viewer__nav slide-viewer__nav--prev" id="prevSlideBtn" title="Previous slide">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <button class="slide-viewer__nav slide-viewer__nav--prev" id="prevSlideBtn"
+                            title="Previous slide">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="15 18 9 12 15 6" />
                             </svg>
                         </button>
                         <div class="slide-viewer__frame" id="slideFrame">
                             <img class="slide-viewer__image" id="slideImage" src="" alt="Slide preview" />
                             <div class="slide-viewer__loading" id="slideLoading">
-                                <div class="loading-spinner"></div>
-                                <p data-i18n="loading.thumbnails">Rendering slide previews...</p>
+                                <div class="progress-ring">
+                                    <svg class="progress-ring__svg" viewBox="0 0 120 120">
+                                        <circle class="progress-ring__bg" cx="60" cy="60" r="52" />
+                                        <circle class="progress-ring__fill" id="progressRingFill" cx="60" cy="60"
+                                            r="52" />
+                                    </svg>
+                                    <span class="progress-ring__text" id="progressPercent">0%</span>
+                                </div>
+                                <p id="progressLabel" data-i18n="loading.thumbnails">Rendering slide previews...</p>
                             </div>
                         </div>
                         <button class="slide-viewer__nav slide-viewer__nav--next" id="nextSlideBtn" title="Next slide">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="9 18 15 12 9 6" />
                             </svg>
                         </button>
@@ -311,8 +341,7 @@
                 <!-- Edit Panel (hidden - disabled to save quota) -->
                 <div class="edit-panel" hidden style="display:none">
                     <div class="edit-panel__inner">
-                        <textarea class="edit-input" id="editInput"
-                            data-i18n-placeholder="placeholder.edit"
+                        <textarea class="edit-input" id="editInput" data-i18n-placeholder="placeholder.edit"
                             placeholder="Describe what you want to change... E.g.: Add more details to slide 3, remove slide 5, add a new slide about market trends after slide 2"></textarea>
                         <button class="btn btn--primary" id="editBtn">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -367,7 +396,7 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="/static/i18n.js?v=3"></script>
-    <script src="/static/app.js?v=12"></script>
+    <script src="/static/app.js?v=14"></script>
 </body>
 
 </html>

@@ -134,7 +134,14 @@ def get_session_thumbnail_paths(session_id: str) -> list[Path]:
     """Return list of existing thumbnail JPEGs for a session, sorted by slide number."""
     _ensure_dir()
     pattern = f"session_{session_id}_slide_*.jpg"
-    paths = sorted(THUMBNAILS_DIR.glob(pattern))
+    paths = list(THUMBNAILS_DIR.glob(pattern))
+    # Sort numerically by slide number (not lexicographic)
+    def _slide_num(p: Path) -> int:
+        try:
+            return int(p.stem.rsplit("_", 1)[-1])
+        except ValueError:
+            return 0
+    paths.sort(key=_slide_num)
     return paths
 
 
@@ -153,12 +160,6 @@ def generate_session_thumbnails(session_id: str, pptx_path: str | Path) -> list[
     """
     _ensure_dir()
     pptx_path = Path(pptx_path)
-
-    # Check if already fully cached
-    existing = get_session_thumbnail_paths(session_id)
-    if existing:
-        logger.debug(f"Session thumbnails already cached for '{session_id}': {len(existing)} slides")
-        return existing
 
     if not pptx_path.exists():
         logger.warning(f"PPTX file not found: {pptx_path}")

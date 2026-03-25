@@ -53,6 +53,9 @@ const dom = {
     slideTitle: $('#slideTitle'),
     prevSlideBtn: $('#prevSlideBtn'),
     nextSlideBtn: $('#nextSlideBtn'),
+    progressRingFill: $('#progressRingFill'),
+    progressPercent: $('#progressPercent'),
+    progressLabel: $('#progressLabel'),
 
     // Edit
     editInput: $('#editInput'),
@@ -409,6 +412,8 @@ function renderSlides() {
     // Show loading state in the viewer
     dom.slideImage.hidden = true;
     dom.slideLoading.hidden = false;
+    updateProgressRing(0);
+    dom.progressLabel.textContent = t('loading.thumbnails') || 'Rendering slide previews...';
     dom.slideTitle.textContent = state.slides[0]?.title || '';
     updateSlideCounter();
     updateNavButtons();
@@ -427,50 +432,47 @@ async function fetchSlideThumbnails() {
         const data = await res.json();
         const newSlides = data.slides || [];
         const total = data.total || state.slides.length;
-        const wasEmpty = state.slideImages.length === 0;
 
         // Update available thumbnails
         state.slideImages = newSlides;
 
-        // Show the first available slide as soon as it arrives
+        // Show current slide image if available (behind the loading overlay)
         if (newSlides.length > 0) {
             const idx = state.currentSlideIndex;
-            if (idx < newSlides.length) {
-                dom.slideImage.src = newSlides[idx].image_url;
-                dom.slideImage.hidden = false;
-                dom.slideLoading.hidden = true;
-            } else if (wasEmpty) {
-                // First load — show slide 1
-                dom.slideImage.src = newSlides[0].image_url;
-                dom.slideImage.hidden = false;
-                dom.slideLoading.hidden = true;
-            }
+            const slideData = (idx < newSlides.length) ? newSlides[idx] : newSlides[0];
+            dom.slideImage.src = slideData.image_url;
+            dom.slideImage.hidden = false;
             updateNavButtons();
         }
 
-        // Still generating — show progress and poll again
+        // Still generating — keep progress ring visible with real-time percentage
         if (data.status === 'generating') {
+            const pct = total > 0 ? Math.round((newSlides.length / total) * 100) : 0;
+            updateProgressRing(pct);
+            dom.slideLoading.hidden = false;
+
             if (newSlides.length === 0) {
-                dom.slideLoading.querySelector('p').textContent =
-                    t('loading.thumbnails') || 'Rendering slide previews...';
+                dom.progressLabel.textContent = 'Đang tải slide...';
             } else {
-                dom.slideLoading.hidden = true;
-                // Update counter to show rendering progress
-                dom.slideCounter.textContent =
-                    `${t('slide.label')} ${state.currentSlideIndex + 1} / ${state.slides.length}  ⟨${t('loading.rendering') || 'Rendering'} ${newSlides.length}/${total}⟩`;
+                dom.progressLabel.textContent =
+                    `Đang tải slide... ${newSlides.length} / ${total}`;
             }
-            setTimeout(() => fetchSlideThumbnails(), 2000);
+            setTimeout(() => fetchSlideThumbnails(), 1500);
             return;
         }
 
-        // All done — update counter to final
-        updateSlideCounter();
-        updateNavButtons();
+        // All done — 100% then hide
+        updateProgressRing(100);
+        dom.progressLabel.textContent = `Hoàn tất ${total} slides`;
+        setTimeout(() => {
+            dom.slideLoading.hidden = true;
+            updateSlideCounter();
+            updateNavButtons();
+        }, 600);
 
     } catch (err) {
         console.error('Failed to fetch slide thumbnails:', err);
-        dom.slideLoading.querySelector('p').textContent =
-            t('loading.thumbnails.fail') || 'Could not generate slide previews';
+        dom.progressLabel.textContent = 'Không thể tải ảnh slide';
     }
 }
 
@@ -523,6 +525,13 @@ function updateNavButtons() {
     // Limit forward to slides with thumbnails available
     const maxIndex = Math.min(state.slides.length, state.slideImages.length) - 1;
     dom.nextSlideBtn.disabled = state.currentSlideIndex >= maxIndex;
+}
+
+function updateProgressRing(percent) {
+    const circumference = 326.73; // 2 * π * 52
+    const offset = circumference - (percent / 100) * circumference;
+    dom.progressRingFill.style.strokeDashoffset = offset;
+    dom.progressPercent.textContent = `${percent}%`;
 }
 
 // ── Modal (Editable) ──────────────────────────────────────
