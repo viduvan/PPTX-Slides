@@ -21,6 +21,7 @@ from ..services import llm_service, slide_service
 from ..services.template_builder import THEMES, AVAILABLE_THEMES, THEME_REGISTRY, THEME_CATEGORIES
 from ..services.thumbnail_generator import generate_thumbnails, get_thumbnail_paths
 from ..core.session_manager import session_manager
+from ..core.config import settings
 
 logger = logging.getLogger("odin_api.routers.slides")
 router = APIRouter(prefix="/api/slides", tags=["Slides"])
@@ -95,11 +96,23 @@ async def generate_slides(request: GenerateRequest):
     Optionally provide word_content (from uploaded docx) to base the slides on.
     """
     try:
-        result = await llm_service.generate_slides(
-            prompt=request.prompt,
-            word_content=request.word_content,
-            existing_slides=[],
-        )
+        word_count = len(request.word_content.split()) if request.word_content else 0
+
+        # Use chunked generation for large documents
+        if word_count > settings.CHUNKED_SLIDE_THRESHOLD and request.word_content:
+            logger.info(
+                f"Large document ({word_count} words), using chunked slide generation"
+            )
+            result = await llm_service.generate_slides_chunked(
+                prompt=request.prompt,
+                word_content=request.word_content,
+            )
+        else:
+            result = await llm_service.generate_slides(
+                prompt=request.prompt,
+                word_content=request.word_content,
+                existing_slides=[],
+            )
         slides = result["slides"]
         # Use explicitly selected theme, or auto-detected
         theme = request.theme if request.theme and request.theme != "auto" else result.get("theme")
