@@ -434,6 +434,12 @@ async function undoSlides() {
 async function downloadSlides() {
     if (!state.sessionId) return;
 
+    // Show loading spinner on download button
+    const btn = dom.downloadBtn;
+    btn.classList.add('is-downloading');
+    btn.disabled = true;
+    btn.setAttribute('data-loading-text', 'Đang tải...');
+
     setStatus(t('status.downloading'), 'loading');
 
     try {
@@ -461,6 +467,11 @@ async function downloadSlides() {
         setStatus(t('status.error'), 'error');
         showToast(`${t('toast.download.error')} ${err.message}`, 'error');
         setTimeout(() => setStatus(t('status.ready'), 'ready'), 3000);
+    } finally {
+        // Always restore button state
+        btn.classList.remove('is-downloading');
+        btn.disabled = false;
+        btn.removeAttribute('data-loading-text');
     }
 }
 

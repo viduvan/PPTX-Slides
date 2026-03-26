@@ -755,6 +755,50 @@ body {
     box-shadow: var(--shadow-glow);
 }
 
+/* Download button loading spinner */
+.btn--accent.is-downloading {
+    pointer-events: none;
+    opacity: 0.85;
+    position: relative;
+    min-width: 160px;
+}
+
+.btn--accent.is-downloading svg,
+.btn--accent.is-downloading > span {
+    visibility: hidden;
+}
+
+.btn--accent.is-downloading::after {
+    content: '';
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border: 3px solid rgba(124, 92, 252, 0.25);
+    border-top-color: var(--accent-primary);
+    border-radius: 50%;
+    animation: downloadSpin 0.7s linear infinite;
+}
+
+.btn--accent.is-downloading::before {
+    content: attr(data-loading-text);
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent-primary);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 30px;
+}
+
+@keyframes downloadSpin {
+    to { transform: rotate(360deg); }
+}
+
 .btn--ghost {
     background: transparent;
     color: var(--text-secondary);
