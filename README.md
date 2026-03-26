@@ -4,27 +4,27 @@
 
 **PPTX-Slides** is a powerful tool that helps you create professional PowerPoint presentations quickly by leveraging the power of Google Gemini AI. You can generate slides from existing documents or simply by providing text prompts.
 
-## ✨ Key Features
+## Key Features
 
-- 🚀 **Smart Slide Generation:** Create complete presentations from input files or concise ideas.
-- 📄 **Multi-format Support:** Upload **Word (.docx)** or **PDF (.pdf)** files for AI to automatically summarize and convert into slides.
-- 💬 **Interactive Editing:** Use prompts to ask the AI to edit, add, or remove slides directly on the web interface.
-- 🎨 **Modern Interface:** Minimalist, intuitive UI with Dark Mode and glassmorphism effects.
-- 🎭 **Theme Options:** Choose from various color themes for your presentation.
-- 📥 **Instant Download:** Preview slides and download the `.pptx` file for immediate use.
+- **Smart Slide Generation:** Create complete presentations from input files or concise ideas.
+- **Multi-format Support:** Upload **Word (.docx)** or **PDF (.pdf)** files for AI to automatically summarize and convert into slides.
+- **Interactive Editing:** Use prompts to ask the AI to edit, add, or remove slides directly on the web interface.
+- **Modern Interface:** Minimalist, intuitive UI with Dark Mode and glassmorphism effects.
+- **Theme Options:** Choose from various color themes for your presentation.
+- **Instant Download:** Preview slides and download the `.pptx` file for immediate use.
 
-## 📺 Video Demo
+## Video Demo
 
 ![PPPTX Slides Demo Recording](assets/demo_recording.webp)
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 - **Backend:** [FastAPI](https://fastapi.tiangolo.com/) (Python)
 - **AI Engine:** [Google Gemini AI](https://ai.google.dev/)
 - **Frontend:** HTML5, Modern CSS (Vanilla), JavaScript
 - **Document Processing:** `python-pptx`, `python-docx`, `PyPDF2`
 
-## 🚀 Installation and Usage
+## Installation and Usage
 
 ### 1. Environment Setup
 
