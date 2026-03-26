@@ -4,6 +4,9 @@ Uses LibreOffice (headless) for PPTX→PDF and pdftoppm for PDF→PNG.
 Caches generated thumbnails in assets/thumbnails/.
 """
 import logging
+import os
+import platform
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -16,6 +19,65 @@ logger = logging.getLogger("pptx_api.thumbnail_generator")
 THUMBNAILS_DIR = Path(settings.BASE_DIR) / "assets" / "thumbnails"
 THUMBNAIL_WIDTH = 960  # px width for theme thumbnail images (high quality, cached once)
 SESSION_THUMB_WIDTH = 1280  # px width for session thumbnails
+
+
+# ── Auto-detect external tools ──────────────────────────────
+
+def _find_libreoffice() -> str:
+    """Find the LibreOffice executable across platforms."""
+    # Try PATH first
+    for name in ("libreoffice", "soffice", "soffice.exe"):
+        found = shutil.which(name)
+        if found:
+            return found
+
+    # Windows: search common installation directories
+    if platform.system() == "Windows":
+        candidate_dirs = [
+            Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "LibreOffice" / "program",
+            Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")) / "LibreOffice" / "program",
+            Path(r"C:\Program Files\LibreOffice\program"),
+            Path(r"C:\Program Files (x86)\LibreOffice\program"),
+        ]
+        for d in candidate_dirs:
+            exe = d / "soffice.exe"
+            if exe.exists():
+                return str(exe)
+
+    return "libreoffice"  # fallback
+
+
+def _find_poppler_tool(tool_name: str) -> str:
+    """Find a poppler tool (pdftoppm, pdfinfo) across platforms."""
+    # Try PATH first
+    found = shutil.which(tool_name)
+    if found:
+        return found
+
+    # Windows: search common poppler locations
+    if platform.system() == "Windows":
+        exe_name = f"{tool_name}.exe"
+        candidate_dirs = [
+            Path(settings.BASE_DIR) / "poppler" / "bin",
+            Path(settings.BASE_DIR) / "poppler" / "Library" / "bin",
+            Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "poppler" / "bin",
+            Path(os.environ.get("LOCALAPPDATA", "")) / "poppler" / "bin",
+            Path(r"C:\poppler\bin"),
+            Path(r"C:\poppler\Library\bin"),
+        ]
+        for d in candidate_dirs:
+            exe = d / exe_name
+            if exe.exists():
+                return str(exe)
+
+    return tool_name  # fallback
+
+
+LIBREOFFICE_CMD = _find_libreoffice()
+PDFTOPPM_CMD = _find_poppler_tool("pdftoppm")
+PDFINFO_CMD = _find_poppler_tool("pdfinfo")
+
+logger.info(f"Thumbnail tools — LibreOffice: {LIBREOFFICE_CMD}, pdftoppm: {PDFTOPPM_CMD}, pdfinfo: {PDFINFO_CMD}")
 SESSION_THUMB_DPI = 150  # DPI for session thumbnail generation
 
 
@@ -66,7 +128,7 @@ def generate_thumbnails(theme_id: str, force: bool = False) -> list[Path]:
             # Step 1: PPTX → PDF via LibreOffice
             result = subprocess.run(
                 [
-                    "libreoffice", "--headless", "--convert-to", "pdf",
+                    LIBREOFFICE_CMD, "--headless", "--convert-to", "pdf",
                     "--outdir", str(tmpdir), str(pptx_path),
                 ],
                 capture_output=True, text=True, timeout=60,
@@ -84,7 +146,7 @@ def generate_thumbnails(theme_id: str, force: bool = False) -> list[Path]:
             output_prefix = str(tmpdir / "slide")
             result = subprocess.run(
                 [
-                    "pdftoppm", "-png", "-r", "150",
+                    PDFTOPPM_CMD, "-png", "-r", "150",
                     "-scale-to-x", str(THUMBNAIL_WIDTH),
                     "-scale-to-y", "-1",  # maintain aspect ratio
                     str(pdf_path), output_prefix,
@@ -177,7 +239,7 @@ def generate_session_thumbnails(session_id: str, pptx_path: str | Path) -> list[
         if not pdf_path.exists():
             result = subprocess.run(
                 [
-                    "libreoffice", "--headless", "--convert-to", "pdf",
+                    LIBREOFFICE_CMD, "--headless", "--convert-to", "pdf",
                     "--outdir", str(pdf_dir), str(pptx_path),
                 ],
                 capture_output=True, text=True, timeout=180,
@@ -209,7 +271,7 @@ def generate_session_thumbnails(session_id: str, pptx_path: str | Path) -> list[
             # Render single page to a temp file, then move
             result = subprocess.run(
                 [
-                    "pdftoppm", "-jpeg", "-jpegopt", "quality=90",
+                    PDFTOPPM_CMD, "-jpeg", "-jpegopt", "quality=90",
                     "-r", str(SESSION_THUMB_DPI),
                     "-scale-to-x", str(SESSION_THUMB_WIDTH),
                     "-scale-to-y", "-1",
@@ -231,7 +293,6 @@ def generate_session_thumbnails(session_id: str, pptx_path: str | Path) -> list[
         logger.info(f"Generated {len(output_paths)}/{total_pages} session thumbnails for '{session_id}'")
 
         # Cleanup temp PDF dir
-        import shutil
         shutil.rmtree(pdf_dir, ignore_errors=True)
 
         return output_paths
@@ -248,7 +309,7 @@ def _get_pdf_page_count(pdf_path: Path) -> int:
     """Get total number of pages in a PDF using pdfinfo."""
     try:
         result = subprocess.run(
-            ["pdfinfo", str(pdf_path)],
+            [PDFINFO_CMD, str(pdf_path)],
             capture_output=True, text=True, timeout=10,
         )
         for line in result.stdout.splitlines():
