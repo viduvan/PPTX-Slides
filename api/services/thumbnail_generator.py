@@ -63,7 +63,7 @@ def _find_poppler_tool(tool_name: str) -> str:
             Path(os.environ.get("PROGRAMFILES", r"C:\Program Files")) / "poppler" / "bin",
             Path(os.environ.get("LOCALAPPDATA", "")) / "poppler" / "bin",
             Path(r"C:\poppler\bin"),
-            Path(r"C:\poppler\Library\bin"),
+            Path(r"C:\poppler\poppler-25.12.0\Library\bin"),
         ]
         for d in candidate_dirs:
             exe = d / exe_name
