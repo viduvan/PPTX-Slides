@@ -40,12 +40,141 @@ def _get_client() -> genai.Client:
     return genai.Client(api_key=settings.GEMINI_API_KEY)
 
 
+def _repair_json(json_str: str) -> str | None:
+    """
+    Attempt to repair common JSON issues from LLM output:
+    - Unescaped double quotes inside string values
+    - Trailing commas before ] or }
+    - Missing commas between objects
+    - Control characters inside strings
+    """
+    if not json_str:
+        return None
+
+    # Step 1: Remove control characters (except \n, \t)
+    repaired = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', json_str)
+
+    # Step 2: Fix trailing commas (e.g., {"a": 1,} or [1, 2,])
+    repaired = re.sub(r',\s*([}\]])', r'\1', repaired)
+
+    # Step 3: Try parsing — if it works, return
+    try:
+        json.loads(repaired)
+        return repaired
+    except json.JSONDecodeError:
+        pass
+
+    # Step 4: Aggressive fix — escape unescaped quotes inside string values
+    # Strategy: parse character by character, track if we're inside a string
+    try:
+        result = []
+        i = 0
+        in_string = False
+        escape_next = False
+
+        while i < len(repaired):
+            ch = repaired[i]
+
+            if escape_next:
+                result.append(ch)
+                escape_next = False
+                i += 1
+                continue
+
+            if ch == '\\':
+                result.append(ch)
+                escape_next = True
+                i += 1
+                continue
+
+            if ch == '"':
+                if not in_string:
+                    # Opening quote
+                    in_string = True
+                    result.append(ch)
+                else:
+                    # Could be closing quote or unescaped internal quote
+                    # Look ahead to see if next non-whitespace is : , } ]
+                    rest = repaired[i+1:].lstrip()
+                    if not rest or rest[0] in (':',',','}',']','\n'):
+                        # This is a real closing quote
+                        in_string = False
+                        result.append(ch)
+                    else:
+                        # Unescaped internal quote — escape it
+                        result.append('\\"')
+                i += 1
+                continue
+
+            # Handle newlines inside strings (replace with \n)
+            if in_string and ch == '\n':
+                result.append('\\n')
+                i += 1
+                continue
+
+            result.append(ch)
+            i += 1
+
+        repaired = ''.join(result)
+
+        # Try again
+        json.loads(repaired)
+        return repaired
+    except (json.JSONDecodeError, Exception):
+        pass
+
+    # Step 5: Last resort — try to extract individual JSON objects and rebuild array
+    try:
+        objects = []
+        # Find all { ... } blocks at the top level
+        depth = 0
+        start = None
+        for i, ch in enumerate(repaired):
+            if ch == '{':
+                if depth == 0:
+                    start = i
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0 and start is not None:
+                    obj_str = repaired[start:i+1]
+                    try:
+                        obj = json.loads(obj_str)
+                        objects.append(obj)
+                    except json.JSONDecodeError:
+                        # Try to fix this individual object
+                        obj_str_fixed = re.sub(r',\s*}', '}', obj_str)
+                        try:
+                            obj = json.loads(obj_str_fixed)
+                            objects.append(obj)
+                        except json.JSONDecodeError:
+                            pass
+                    start = None
+
+        if objects:
+            return json.dumps(objects, ensure_ascii=False)
+    except Exception:
+        pass
+
+    return None
+
+
 def _extract_json_from_text(text: str) -> str | None:
     """Extract JSON array or object from LLM response text, with repair for truncated output."""
     # Try to find complete JSON array first
     match = re.search(r'\[.*\]', text, re.DOTALL)
     if match:
-        return match.group(0)
+        candidate = match.group(0)
+        # Validate it parses
+        try:
+            json.loads(candidate)
+            return candidate
+        except json.JSONDecodeError:
+            # Try repair
+            repaired = _repair_json(candidate)
+            if repaired:
+                logger.warning("Repaired malformed JSON from LLM response")
+                return repaired
 
     # Try to repair truncated JSON array (output cut off before closing ])
     match = re.search(r'\[.*', text, re.DOTALL)
@@ -60,6 +189,12 @@ def _extract_json_from_text(text: str) -> str | None:
                 logger.warning("Repaired truncated JSON array")
                 return repaired
             except json.JSONDecodeError:
+                # Try repair on the truncated + closed version
+                fixed = _repair_json(repaired)
+                if fixed:
+                    logger.warning("Repaired truncated + malformed JSON")
+                    return fixed
+
                 # Try removing the last incomplete object
                 second_last = partial.rfind('}', 0, last_brace)
                 if second_last > 0:
@@ -69,12 +204,30 @@ def _extract_json_from_text(text: str) -> str | None:
                         logger.warning("Repaired truncated JSON (removed last incomplete object)")
                         return repaired
                     except json.JSONDecodeError:
-                        pass
+                        fixed = _repair_json(repaired)
+                        if fixed:
+                            logger.warning("Repaired truncated JSON (removed last object + fixed)")
+                            return fixed
 
     # Fallback to JSON object
     match = re.search(r'\{.*\}', text, re.DOTALL)
     if match:
-        return match.group(0)
+        candidate = match.group(0)
+        try:
+            json.loads(candidate)
+            return candidate
+        except json.JSONDecodeError:
+            repaired = _repair_json(candidate)
+            if repaired:
+                logger.warning("Repaired malformed JSON object from LLM")
+                return repaired
+
+    # Last resort: try to repair the entire text
+    repaired = _repair_json(text)
+    if repaired:
+        logger.warning("Repaired JSON from raw LLM text")
+        return repaired
+
     return None
 
 
@@ -337,234 +490,43 @@ _VIETNAM_HISTORY_KEYWORDS = {
 }
 
 
-
-# Vietnamese LITERATURE keywords for detection
-_VIETNAM_LITERATURE_KEYWORDS = {
-    # ═══ AUTHORS & POETS ══════════════════════════════════════
-    # Classical
-    "nguyễn du", "nguyễn trãi", "hồ xuân hương", "bà huyện thanh quan",
-    "nguyễn đình chiểu", "nguyễn công trứ", "cao bá quát", "đoàn thị điểm",
-    "lê quý đôn", "nguyễn bỉnh khiêm", "trạng trình",
-    "phạm đình hổ", "lê hữu trác", "hải thượng lãn ông",
-    "đặng trần côn", "ngô thì nhậm",
-    # Modern (early 20th century)
-    "nam cao", "ngô tất tố", "vũ trọng phụng", "nguyên hồng",
-    "thạch lam", "xuân diệu", "huy cận", "chế lan viên",
-    "hàn mặc tử", "tố hữu", "nguyễn tuân", "tô hoài",
-    "nhất linh", "khái hưng", "thế lữ", "lưu trọng lư",
-    "phạm quỳnh", "nguyễn văn vĩnh", "phan khôi",
-    "tản đà", "trần tế xương", "tú xương",
-    "nguyễn khuyến", "nguyễn khắc hiếu",
-    # Modern & Contemporary
-    "nguyễn minh châu", "lê minh khuê", "bảo ninh", "nguyễn huy thiệp",
-    "dương thu hương", "ma văn kháng", "nguyễn nhật ánh",
-    "nguyễn ngọc tư", "phạm tiến duật", "thu bồn",
-    "anh đức", "nguyễn quang sáng", "sơn nam",
-    "hồ chí minh",  # as poet/writer (Nhật ký trong tù)
-    "trần đăng khoa", "phạm thị hoài",
-    # War-era writers
-    "dương thị xuân quý", "lê anh xuân", "nguyễn thi",
-
-    # ═══ LITERARY WORKS ═══════════════════════════════════════
-    # Classical
-    "truyện kiều", "kiều", "đoạn trường tân thanh",
-    "chinh phụ ngâm", "cung oán ngâm khúc", "cung oán ngâm",
-    "lục vân tiên", "văn tế nghĩa sĩ cần giuộc",
-    "bình ngô đại cáo", "hịch tướng sĩ",
-    "quốc âm thi tập", "truyền kỳ mạn lục", "hoàng lê nhất thống chí",
-    "thượng kinh ký sự", "vũ trung tùy bút",
-    "nam quốc sơn hà", "chiếu dời đô",
-    "truyện an dương vương", "sự tích trầu cau",
-    "tấm cám", "sơn tinh thủy tinh", "thánh gióng",
-    # Modern works
-    "chí phèo", "tắt đèn", "lão hạc", "số đỏ", "giông tố",
-    "vợ nhặt", "vợ chồng a phủ", "đời thừa",
-    "bước đường cùng", "bỉ vỏ", "dế mèn phiêu lưu ký",
-    "tây tiến", "việt bắc", "đất nước",
-    "nhật ký trong tù", "tuyên ngôn độc lập",
-    "rừng xà nu", "những ngôi sao xa xôi",
-    "nỗi buồn chiến tranh", "mắt biếc",
-    "tôi thấy hoa vàng trên cỏ xanh", "cho tôi xin một vé đi tuổi thơ",
-    "kính vạn hoa", "đất rừng phương nam",
-    "mùa lá rụng trong vườn", "thời xa vắng",
-
-    # ═══ LITERARY CONCEPTS & GENRES ═══════════════════════════
-    "văn học việt nam", "văn học vn", "văn học",
-    "thơ", "truyện ngắn", "tiểu thuyết", "kịch",
-    "ca dao", "tục ngữ", "thành ngữ", "câu đố",
-    "truyện cổ tích", "truyện truyền thuyết", "truyền thuyết",
-    "sử thi", "hịch", "cáo", "chiếu", "biểu",
-    "thơ lục bát", "lục bát", "song thất lục bát",
-    "thơ đường luật", "thơ tứ tuyệt", "ngũ ngôn",
-    "chữ nôm", "chữ hán", "quốc ngữ",
-    "thơ mới", "phong trào thơ mới", "tự lực văn đoàn",
-    "văn học hiện thực", "hiện thực phê phán",
-    "văn học cách mạng", "văn học kháng chiến",
-    "văn học trung đại", "văn học dân gian",
-    "văn xuôi", "phóng sự", "bút ký", "tùy bút", "hồi ký",
-    "nhà thơ", "nhà văn", "thi sĩ", "tác phẩm", "tác giả",
-    "phân tích", "bình giảng", "cảm nhận", "nghệ thuật",
-}
-
-# Vietnamese GEOGRAPHY keywords for detection
-_VIETNAM_GEOGRAPHY_KEYWORDS = {
-    # ═══ REGIONS & AREAS ══════════════════════════════════════
-    "việt nam", "bắc bộ", "trung bộ", "nam bộ",
-    "tây bắc", "đông bắc", "bắc trung bộ", "nam trung bộ",
-    "tây nguyên", "đông nam bộ", "tây nam bộ",
-    "đồng bằng sông hồng", "đồng bằng sông cửu long",
-    "duyên hải miền trung",
-
-    # ═══ PROVINCES & CITIES ═══════════════════════════════════
-    "hà nội", "hồ chí minh", "sài gòn", "đà nẵng", "hải phòng", "cần thơ",
-    "huế", "nha trang", "đà lạt", "vũng tàu", "quy nhơn", "hạ long",
-    "phú quốc", "hội an", "sapa", "sa pa", "tam đảo", "ba vì",
-    "hà giang", "cao bằng", "lạng sơn", "lào cai", "yên bái",
-    "thái nguyên", "bắc kạn", "tuyên quang", "phú thọ",
-    "sơn la", "điện biên", "lai châu", "hòa bình",
-    "quảng ninh", "bắc giang", "bắc ninh", "hải dương",
-    "hưng yên", "thái bình", "nam định", "ninh bình",
-    "hà nam", "vĩnh phúc",
-    "thanh hóa", "nghệ an", "hà tĩnh", "quảng bình",
-    "quảng trị", "thừa thiên huế",
-    "quảng nam", "quảng ngãi", "bình định", "phú yên",
-    "khánh hòa", "ninh thuận", "bình thuận",
-    "kon tum", "gia lai", "đắk lắk", "đắk nông", "lâm đồng",
-    "bình phước", "tây ninh", "bình dương", "đồng nai",
-    "bà rịa", "long an", "tiền giang", "bến tre",
-    "trà vinh", "vĩnh long", "đồng tháp", "an giang",
-    "kiên giang", "hậu giang", "sóc trăng", "bạc liêu", "cà mau",
-
-    # ═══ RIVERS ═══════════════════════════════════════════════
-    "sông hồng", "sông mê kông", "mekong", "sông cửu long",
-    "sông đà", "sông lô", "sông mã", "sông cả", "sông lam",
-    "sông hương", "sông thu bồn", "sông đồng nai",
-    "sông bạch đằng", "sông tiền", "sông hậu",
-    "sông bến hải", "sông thạch hãn",
-
-    # ═══ MOUNTAINS & HIGHLANDS ════════════════════════════════
-    "fansipan", "phan xi păng", "hoàng liên sơn",
-    "dãy trường sơn", "trường sơn", "tây nguyên",
-    "núi bà đen", "núi ngự bình", "núi bà nà",
-    "núi cấm", "tam đảo", "ba vì", "yên tử",
-    "đèo hải vân", "hải vân", "đèo ngang",
-    "đèo khau phạ", "đèo mã pí lèng", "mã pí lèng",
-    "cao nguyên", "đồi chè",
-
-    # ═══ SEAS, ISLANDS & COASTAL ══════════════════════════════
-    "biển đông", "vịnh hạ long", "vịnh bắc bộ", "vịnh thái lan",
-    "côn đảo", "phú quốc", "cát bà", "lý sơn",
-    "hoàng sa", "trường sa", "bán đảo sơn trà",
-    "bãi biển", "bờ biển", "đường bờ biển",
-    "mũi né", "mũi cà mau", "mũi đại lãnh",
-
-    # ═══ NATURAL FEATURES & HERITAGE ══════════════════════════
-    "phong nha kẻ bàng", "phong nha", "kẻ bàng",
-    "tràng an", "tam cốc", "bích động",
-    "rừng ngập mặn", "đất ngập nước", "rừng nhiệt đới",
-    "vườn quốc gia", "khu bảo tồn", "di sản thế giới",
-    "cúc phương", "cát tiên", "ba bể", "hồ ba bể",
-    "thác bản giốc", "ruộng bậc thang",
-    "hồ hoàn kiếm", "hồ tây", "hồ xuân hương",
-
-    # ═══ GEOGRAPHY CONCEPTS ═══════════════════════════════════
-    "địa lý việt nam", "địa lí việt nam", "địa lý", "địa lí",
-    "địa hình", "khí hậu", "nhiệt đới", "gió mùa",
-    "đồng bằng", "châu thổ", "bồi tụ", "phù sa",
-    "vùng kinh tế", "dân cư", "dân số",
-    "nông nghiệp", "lúa nước", "lúa gạo",
-    "biên giới", "lãnh thổ", "diện tích",
-    "hình chữ s", "bản đồ", "tọa độ",
-    "tỉnh", "thành phố", "quận", "huyện",
-    "miền bắc", "miền trung", "miền nam",
-}
-
-
-def _detect_document_context(text: str) -> dict:
+def _detect_history_context(text: str) -> dict:
     """
-    Detect document topics: Vietnamese history, literature, geography.
-    Returns a dict with detected context flags.
+    Detect if the document is about history, especially Vietnamese history.
+    Returns a dict with detected context flags and matched keywords.
     """
     if not text:
-        return {
-            "is_history": False, "is_vietnam_history": False,
-            "is_literature": False, "is_vietnam_literature": False,
-            "is_geography": False, "is_vietnam_geography": False,
-            "matched": [],
-        }
+        return {"is_history": False, "is_vietnam_history": False, "matched": []}
 
     text_lower = text.lower()
     preview = text_lower[:5000]  # Check first 5000 chars
 
-    # ── Vietnamese History ──
-    matched_vn_history = [kw for kw in _VIETNAM_HISTORY_KEYWORDS if kw in preview]
-    general_history_kw = {
+    # Check Vietnamese history keywords
+    matched_vn = [kw for kw in _VIETNAM_HISTORY_KEYWORDS if kw in preview]
+
+    # General history detection
+    general_history_keywords = {
         "lịch sử", "history", "historical", "tiểu sử", "biography",
         "cuộc đời", "thế kỷ", "century", "triều đại", "dynasty",
         "chiến tranh", "war", "cách mạng", "revolution",
     }
-    matched_gen_history = [kw for kw in general_history_kw if kw in preview]
-    is_vn_history = len(matched_vn_history) >= 2 or (
-        len(matched_vn_history) >= 1 and len(matched_gen_history) >= 1
-    )
-    is_history = is_vn_history or len(matched_gen_history) >= 2
+    matched_general = [kw for kw in general_history_keywords if kw in preview]
 
-    # ── Vietnamese Literature ──
-    matched_vn_lit = [kw for kw in _VIETNAM_LITERATURE_KEYWORDS if kw in preview]
-    general_lit_kw = {
-        "văn học", "literature", "literary", "thơ", "poetry", "poem",
-        "truyện", "novel", "story", "tác phẩm", "nhà văn", "nhà thơ",
-        "phân tích", "bình giảng", "cảm nhận", "tác giả", "author",
-    }
-    matched_gen_lit = [kw for kw in general_lit_kw if kw in preview]
-    is_vn_literature = len(matched_vn_lit) >= 2 or (
-        len(matched_vn_lit) >= 1 and len(matched_gen_lit) >= 1
+    is_vietnam_history = len(matched_vn) >= 2 or (
+        len(matched_vn) >= 1 and len(matched_general) >= 1
     )
-    is_literature = is_vn_literature or len(matched_gen_lit) >= 2
+    is_history = is_vietnam_history or len(matched_general) >= 2
 
-    # ── Vietnamese Geography ──
-    matched_vn_geo = [kw for kw in _VIETNAM_GEOGRAPHY_KEYWORDS if kw in preview]
-    general_geo_kw = {
-        "địa lý", "địa lí", "geography", "geographical",
-        "địa hình", "terrain", "khí hậu", "climate",
-        "sông", "river", "núi", "mountain", "biển", "sea",
-        "đồng bằng", "plain", "vùng", "region",
-    }
-    matched_gen_geo = [kw for kw in general_geo_kw if kw in preview]
-    is_vn_geography = len(matched_vn_geo) >= 3 or (
-        len(matched_vn_geo) >= 2 and len(matched_gen_geo) >= 1
-    )
-    is_geography = is_vn_geography or len(matched_gen_geo) >= 3
-
-    # Build result
-    all_matched = matched_vn_history[:3] + matched_vn_lit[:3] + matched_vn_geo[:3]
     result = {
         "is_history": is_history,
-        "is_vietnam_history": is_vn_history,
-        "is_literature": is_literature,
-        "is_vietnam_literature": is_vn_literature,
-        "is_geography": is_geography,
-        "is_vietnam_geography": is_vn_geography,
-        "matched": all_matched[:5],
+        "is_vietnam_history": is_vietnam_history,
+        "matched": matched_vn[:5],
     }
 
-    # Logging
-    detected = []
-    if is_vn_history:
-        detected.append(f"VN History ({matched_vn_history[:3]})")
+    if is_vietnam_history:
+        logger.info(f"Detected Vietnamese history content. Matched: {matched_vn[:5]}")
     elif is_history:
-        detected.append(f"History ({matched_gen_history[:3]})")
-    if is_vn_literature:
-        detected.append(f"VN Literature ({matched_vn_lit[:3]})")
-    elif is_literature:
-        detected.append(f"Literature ({matched_gen_lit[:3]})")
-    if is_vn_geography:
-        detected.append(f"VN Geography ({matched_vn_geo[:3]})")
-    elif is_geography:
-        detected.append(f"Geography ({matched_gen_geo[:3]})")
-
-    if detected:
-        logger.info(f"Document context detected: {', '.join(detected)}")
+        logger.info(f"Detected history content. Matched: {matched_general[:5]}")
 
     return result
 
@@ -608,11 +570,8 @@ async def generate_slides(
 
     # Extract document topic for image keyword guidance
     document_topic = _extract_document_topic(word_content) if word_content else ""
-    doc_context = _detect_document_context(word_content) if word_content else {
-        "is_history": False, "is_vietnam_history": False,
-        "is_literature": False, "is_vietnam_literature": False,
-        "is_geography": False, "is_vietnam_geography": False,
-        "matched": [],
+    history_context = _detect_history_context(word_content) if word_content else {
+        "is_history": False, "is_vietnam_history": False, "matched": []
     }
     if document_topic:
         logger.info(f"Document topic extracted: '{document_topic[:80]}...'")
@@ -685,10 +644,21 @@ async def generate_slides(
         "IMAGE_KEYWORD RULES (CRITICAL - READ CAREFULLY):\n"
         "The image_keyword field is used to search stock photos on Pixabay. "
         "BAD keywords will result in COMPLETELY WRONG images on the slides.\n\n"
+        "KEYWORD STRATEGY — Use CONCRETE PHYSICAL NOUNS that are photographable:\n"
+        "- GOOD nouns: temple, pagoda, monument, statue, museum, citadel, river, bridge, "
+        "rice field, mountain, village, architecture, palace\n"
+        "- BAD abstract words: independence, revolution, struggle, freedom, unity, "
+        "leadership, ideology, development (these return RANDOM stock photos!)\n\n"
         "Rules:\n"
-        "- Each image_keyword MUST be 2-4 specific English words directly related to the slide content\n"
-        "- MUST include the main subject/person/topic name when applicable\n"
+        "- Each image_keyword MUST be 2-4 specific English words\n"
+        "- MUST include a CONCRETE place, building, landmark, or cultural object\n"
+        "- MUST include the country/region name (e.g., 'Vietnam', 'Hanoi')\n"
         "- Be VERY SPECIFIC - generic words return random unrelated photos\n"
+        "- ⚠️ UNIQUENESS RULE: EVERY slide MUST have a DIFFERENT image_keyword!\n"
+        "  NO TWO SLIDES should have the same or similar image_keyword.\n"
+        "  Each keyword must describe something VISUALLY DIFFERENT.\n"
+        "  Example: If one slide uses 'Vietnam temple Hanoi', another should use\n"
+        "  'Vietnam rice paddy countryside', NOT 'Vietnam temple pagoda'.\n\n"
     )
 
     # Add document-specific context if available
@@ -700,107 +670,58 @@ async def generate_slides(
         )
 
     image_keyword_instruction += (
-        "Format: \"{main subject} {specific detail}\"\n"
+        "Format: \"{country/place} {concrete noun}\"\n"
         "Examples of GOOD vs BAD image_keyword values:\n"
         "  For a document about Ho Chi Minh:\n"
-        "    GOOD: \"Ho Chi Minh\", \"Vietnam independence\", \"Hanoi Vietnam\", \"Vietnam revolution\"\n"
-        "    BAD: \"leader\", \"man\", \"flag\", \"woman\", \"field\", \"soldier\"\n"
+        "    GOOD: \"Vietnam pagoda Hanoi\", \"Ho Chi Minh mausoleum\", \"Ba Dinh square\", "
+        "\"Vietnam heritage monument\"\n"
+        "    BAD: \"leader\", \"independence\", \"revolution\", \"struggle\", \"flag\"\n"
         "  For a document about Climate Change:\n"
         "    GOOD: \"global warming earth\", \"carbon emission factory\", \"solar energy panel\"\n"
-        "    BAD: \"nature\", \"world\", \"green\", \"sky\"\n"
-        "  For a document about Machine Learning:\n"
-        "    GOOD: \"artificial intelligence brain\", \"neural network diagram\", \"data analysis chart\"\n"
-        "    BAD: \"computer\", \"technology\", \"screen\"\n\n"
+        "    BAD: \"nature\", \"world\", \"green\", \"sky\"\n\n"
         "FORBIDDEN - NEVER use these generic words alone as image_keyword:\n"
         "person, man, woman, people, girl, boy, landscape, nature, building, city, \n"
         "field, flag, leader, soldier, office, team, sky, road, mountain\n\n"
     )
 
     # Add STRICT Vietnamese history rules if detected
-    if doc_context.get("is_vietnam_history"):
+    if history_context.get("is_vietnam_history"):
         image_keyword_instruction += (
             "⚠️ VIETNAMESE HISTORY DOCUMENT DETECTED — SPECIAL RULES APPLY:\n"
             "This document is about VIETNAMESE HISTORY. Image keywords MUST be strictly relevant.\n\n"
             "MANDATORY: Every image_keyword MUST include 'Vietnam' or a specific Vietnamese \n"
-            "historical name/place/event. Examples:\n"
-            "  \"Vietnam Ho Chi Minh\", \"Dien Bien Phu battle\", \"Vietnam independence ceremony\",\n"
-            "  \"Ba Dinh square Hanoi\", \"Vietnam temple heritage\", \"Hanoi old quarter\",\n"
-            "  \"Vietnam rice field countryside\", \"Hue imperial citadel\", \"Vietnam war memorial\",\n"
-            "  \"Vietnam traditional culture\", \"Thang Long Hanoi\", \"Vietnam pagoda temple\",\n"
-            "  \"Vo Nguyen Giap\", \"Vietnam revolution poster\", \"Vietnam flag red star\"\n\n"
+            "historical name/place/event.\n\n"
+            "USE DIVERSE keywords from this pool (DO NOT repeat any keyword):\n"
+            "  Places: \"Ba Dinh square Hanoi\", \"Hanoi old quarter\", \"Hue imperial citadel\",\n"
+            "          \"Vietnam pagoda temple\", \"Thang Long Hanoi\", \"Vietnam museum history\",\n"
+            "          \"Vietnam Ho Chi Minh mausoleum\", \"one pillar pagoda Hanoi\",\n"
+            "          \"Vietnam Pac Bo cave\", \"Vietnam Con Dao island\"\n"
+            "  Culture: \"Vietnam traditional culture\", \"Vietnam flag red star\",\n"
+            "           \"Vietnam rice field countryside\", \"Vietnam ao dai tradition\",\n"
+            "           \"Vietnam calligraphy art\", \"Vietnam ancient architecture\"\n"
+            "  Events: \"Vietnam independence ceremony\", \"Vietnam revolution poster\",\n"
+            "          \"Dien Bien Phu valley\", \"Vietnam war memorial monument\",\n"
+            "          \"Vietnam peace celebration\", \"Vietnam reunification\"\n"
+            "  Monuments: \"Ho Chi Minh statue Vietnam\", \"Vietnam hero monument\",\n"
+            "             \"Vietnam national assembly\", \"Vietnam military museum\"\n"
+            "  History: \"Vietnam ancient temple\", \"Vietnam dynasty architecture\",\n"
+            "           \"Vietnam traditional village\", \"Vietnam heritage site\"\n\n"
             "ABSOLUTELY FORBIDDEN for Vietnamese history documents:\n"
-            "- Random women/girls/models (NEVER appropriate for history content)\n"
+            "- Random women/girls/models/fashion photos\n"
+            "- Motorbikes, scooters, modern vehicles\n"
+            "- Modern city skyline photos (skyscrapers)\n"
             "- American soldiers or US military imagery\n"
-            "- South Vietnam flag (yellow with red stripes) — this is politically sensitive\n"
+            "- South Vietnam flag (yellow with red stripes) — politically sensitive\n"
             "- Generic landscape/nature photos without Vietnamese context\n"
-            "- Any image that could be disrespectful to Vietnamese historical figures\n"
-            "- Modern city photos that are not Vietnamese\n"
-            "- Random flags from other countries\n\n"
+            "- Selfies, couples, wedding photos\n"
+            "- Business/corporate/office imagery\n\n"
         )
-    elif doc_context.get("is_history"):
+    elif history_context.get("is_history"):
         image_keyword_instruction += (
             "HISTORY DOCUMENT DETECTED — Image keywords must be historically relevant.\n"
             "Always include the specific historical period, person, or event name.\n"
             "NEVER use generic keywords like 'leader', 'war', 'battle' without context.\n"
             "Always prefix with the specific country/era: e.g., 'Vietnam revolution', not just 'revolution'.\n\n"
-        )
-
-    # Add Vietnamese LITERATURE rules if detected
-    if doc_context.get("is_vietnam_literature"):
-        image_keyword_instruction += (
-            "📚 VIETNAMESE LITERATURE DOCUMENT DETECTED — SPECIAL RULES APPLY:\n"
-            "This document is about VIETNAMESE LITERATURE. Image keywords MUST reflect \n"
-            "Vietnamese literary culture, NOT random unrelated photos.\n\n"
-            "MANDATORY: Every image_keyword MUST be related to Vietnamese culture, literature, \n"
-            "or the specific literary work/author. Examples:\n"
-            "  \"Vietnam traditional poetry\", \"Vietnamese calligraphy art\",\n"
-            "  \"Vietnam ancient book scroll\", \"Vietnamese village countryside\",\n"
-            "  \"Vietnam temple literature\", \"Vietnamese traditional painting\",\n"
-            "  \"Vietnam old scholar\", \"Vietnamese ink brush\",\n"
-            "  \"Vietnam Hanoi temple literature\", \"Vietnamese woman ao dai\",\n"
-            "  \"Vietnam rice paddy landscape\", \"Vietnamese folk art\"\n\n"
-            "For specific works, use the work's theme:\n"
-            "  Truyện Kiều → \"Vietnamese woman traditional dress\", \"Vietnam moonlight poetry\"\n"
-            "  Chí Phèo → \"Vietnamese village rural\", \"Vietnam peasant countryside\"\n"
-            "  Tắt Đèn → \"Vietnamese poor family village\", \"Vietnam rural hardship\"\n\n"
-            "FORBIDDEN for Vietnamese literature documents:\n"
-            "- Modern Western/non-Vietnamese imagery\n"
-            "- Random photos of people not in Vietnamese context\n"
-            "- Generic technology, business, or office imagery\n\n"
-        )
-    elif doc_context.get("is_literature"):
-        image_keyword_instruction += (
-            "LITERATURE DOCUMENT DETECTED — Image keywords must reflect literary themes.\n"
-            "Use keywords related to books, writing, cultural context of the literary work.\n"
-            "NEVER use generic keywords unrelated to literature or the work's setting.\n\n"
-        )
-
-    # Add Vietnamese GEOGRAPHY rules if detected
-    if doc_context.get("is_vietnam_geography"):
-        image_keyword_instruction += (
-            "🗺️ VIETNAMESE GEOGRAPHY DOCUMENT DETECTED — SPECIAL RULES APPLY:\n"
-            "This document is about VIETNAMESE GEOGRAPHY. Image keywords MUST show \n"
-            "actual Vietnamese landscapes, maps, and locations.\n\n"
-            "MANDATORY: Every image_keyword MUST include 'Vietnam' or a specific Vietnamese \n"
-            "geographic feature/location. Examples:\n"
-            "  \"Vietnam Ha Long Bay\", \"Vietnam rice terrace Sapa\",\n"
-            "  \"Vietnam Mekong Delta river\", \"Vietnam Da Lat highlands\",\n"
-            "  \"Vietnam map geography\", \"Vietnam Phong Nha cave\",\n"
-            "  \"Vietnam Ho Chi Minh City aerial\", \"Vietnam Hanoi Red River\",\n"
-            "  \"Vietnam Hue Perfume River\", \"Vietnam central highlands coffee\",\n"
-            "  \"Vietnam coastline beach\", \"Vietnam Fansipan mountain\",\n"
-            "  \"Vietnam tropical forest\", \"Vietnam floating market\"\n\n"
-            "FORBIDDEN for Vietnamese geography documents:\n"
-            "- Landscapes from other countries (especially similar Asian countries)\n"
-            "- Generic mountain/river/sea photos without Vietnamese context\n"
-            "- Random people, buildings, or objects unrelated to geography\n"
-            "- Maps of other countries\n\n"
-        )
-    elif doc_context.get("is_geography"):
-        image_keyword_instruction += (
-            "GEOGRAPHY DOCUMENT DETECTED — Image keywords must show geographic features.\n"
-            "Always include the specific country/region name with the geographic feature.\n"
-            "Use: 'Vietnam river delta', not just 'river'. Include specific place names.\n\n"
         )
 
     image_keyword_instruction += (
@@ -825,6 +746,7 @@ async def generate_slides(
                 system_instruction=system_instruction,
                 temperature=0.7,
                 top_p=1.0,
+                response_mime_type="application/json",
             ),
         )
         response_text = response.text
@@ -857,6 +779,28 @@ async def generate_slides(
 
     except json.JSONDecodeError as e:
         logger.error(f"JSON parse error: {e}")
+        # Try repair as last resort
+        if response_text:
+            logger.info("Attempting JSON repair on failed LLM response...")
+            repaired = _repair_json(response_text)
+            if repaired:
+                try:
+                    parsed = json.loads(repaired)
+                    if isinstance(parsed, dict):
+                        parsed = [parsed]
+                    for slide in parsed:
+                        if "content" in slide:
+                            slide["content"] = _process_content(slide["content"])
+                        if "narration" not in slide:
+                            slide["narration"] = ""
+                    logger.warning(f"JSON repair succeeded — recovered {len(parsed)} slides")
+                    return {
+                        "slides": parsed,
+                        "theme": detect_theme_from_prompt(prompt),
+                        "document_topic": document_topic,
+                    }
+                except Exception as repair_err:
+                    logger.error(f"JSON repair also failed: {repair_err}")
         raise ValueError(f"Failed to parse LLM response as JSON: {e}")
     except Exception as e:
         logger.error(f"Error generating slides: {e}")
