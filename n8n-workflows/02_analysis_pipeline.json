@@ -1,0 +1,248 @@
+{
+  "name": "PPTX-Slides: Analysis Pipeline",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start-trigger",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst wordCount = input.word_count || 0;\nconst hasDoc = input.has_document || false;\n\nreturn [{\n  json: {\n    ...input,\n    mode: !hasDoc ? 'prompt_only' : (wordCount <= 10000 ? 'direct' : 'chunked'),\n    chunk_count: wordCount > 10000 ? Math.ceil(wordCount / 10000) : 1\n  }\n}];"
+      },
+      "id": "detect-mode",
+      "name": "Detect Processing Mode",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "mode-check",
+              "leftValue": "={{ $json.mode }}",
+              "rightValue": "chunked",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-chunked",
+      "name": "Needs Chunking?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://analyst:8001/split-chunks",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.document_text, chunk_size: 10000, job_id: $json.job_id }) }}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "http-split",
+      "name": "Agent: Split Chunks",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 200],
+      "notesInFlow": true,
+      "notes": "POST analyst:8001/split-chunks\nSplits document into 10K word chunks"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "chunks",
+        "options": {}
+      },
+      "id": "split-items",
+      "name": "Split Into Items",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + $credentials.httpQueryAuth.value }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Từ đoạn văn dưới đây, trích xuất cấu trúc. KHÔNG tóm tắt. CHỈ liệt kê.\\n\\nTrả về JSON:\\n{\\n  \"headings\": [\"Tiêu đề chính\"],\\n  \"topics\": [\"Chủ đề A\", \"Chủ đề B\"],\\n  \"key_entities\": [\"Tên riêng\", \"Năm\", \"Sự kiện\"],\\n  \"content_type\": \"narrative|data|argument|mixed\",\\n  \"position_hint\": \"intro|body|conclusion\"\\n}\\n\\nĐoạn văn (chunk ' + $json.chunk_index + '/' + $json.total_chunks + '):\\n' + $json.chunk_text }] }], generationConfig: { temperature: 0.2, responseMimeType: 'application/json' } }) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpQueryAuth",
+        "options": { "timeout": 60000 }
+      },
+      "id": "llm-extract",
+      "name": "LLM: Extract Metadata",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 200],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CONFIGURE_ME_GEMINI",
+          "name": "Gemini API Key"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Gemini Flash: Extract headings, topics, entities\nCredential: HTTP Query Auth (key=GEMINI_API_KEY)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Gemini response → metadata\nconst response = $input.first().json;\nconst text = response.candidates?.[0]?.content?.parts?.[0]?.text || '{}';\n\ntry {\n  const metadata = JSON.parse(text);\n  return [{ json: { chunk_index: $('Split Into Items').item.json.chunk_index, metadata } }];\n} catch (e) {\n  return [{ json: { chunk_index: 0, metadata: { headings: [], topics: [], key_entities: [], error: e.message } } }];\n}"
+      },
+      "id": "parse-extract",
+      "name": "Parse Extract Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 200]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "id": "aggregate-metadata",
+      "name": "Aggregate All Metadata",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [1780, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://analyst:8001/merge-metadata",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ job_id: $json.job_id, all_metadata: $json.data }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "http-merge",
+      "name": "Agent: Merge Metadata",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 200],
+      "notesInFlow": true,
+      "notes": "POST analyst:8001/merge-metadata\nCombine metadata from all chunks"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + $credentials.httpQueryAuth.value }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Từ danh sách metadata các chunks dưới đây, hãy:\\n1. Tạo outline cho slide presentation\\n2. Map mỗi section tới chunk_ids chứa nội dung liên quan\\n\\nTrả về JSON:\\n{\\n  \"outline\": [{\"section_id\": 0, \"title\": \"...\", \"slides\": 2, \"key_points\": [\"...\"]}],\\n  \"chunk_mapping\": {\"0\": [0], \"1\": [1,2], \"2\": [3,4]},\\n  \"total_slides\": 15,\\n  \"topic\": \"...\",\\n  \"language\": \"vi\",\\n  \"context\": \"general|vietnam_history|tech|business\",\\n  \"theme_suggestion\": \"midnight\"\\n}\\n\\nUser prompt: ' + $json.prompt + '\\n\\nMerged metadata:\\n' + JSON.stringify($json.merged_metadata) }] }], generationConfig: { temperature: 0.3, responseMimeType: 'application/json' } }) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpQueryAuth",
+        "options": { "timeout": 60000 }
+      },
+      "id": "llm-outline",
+      "name": "LLM: Create Outline + Mapping",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2220, 200],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CONFIGURE_ME_GEMINI",
+          "name": "Gemini API Key"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Gemini Flash: Create structured outline\n+ map sections to chunk IDs"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + $credentials.httpQueryAuth.value }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Từ prompt sau, hãy tạo outline cho presentation.\\n\\nTrả về JSON:\\n{\\n  \"outline\": [{\"section_id\": 0, \"title\": \"...\", \"slides\": 2, \"key_points\": [\"...\"]}],\\n  \"chunk_mapping\": {},\\n  \"total_slides\": 10,\\n  \"topic\": \"...\",\\n  \"language\": \"vi\",\\n  \"context\": \"general\",\\n  \"theme_suggestion\": \"midnight\"\\n}\\n\\nUser prompt: ' + $json.prompt }] }], generationConfig: { temperature: 0.5, responseMimeType: 'application/json' } }) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpQueryAuth",
+        "options": { "timeout": 30000 }
+      },
+      "id": "llm-direct",
+      "name": "LLM: Direct Outline",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 420],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CONFIGURE_ME_GEMINI",
+          "name": "Gemini API Key"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "For ≤10K words or prompt-only:\nDirect outline generation in 1 call"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Gemini outline response (from either branch)\nconst response = $input.first().json;\nconst text = response.candidates?.[0]?.content?.parts?.[0]?.text || '{}';\n\ntry {\n  const result = JSON.parse(text);\n  return [{ json: { analyst_result: result } }];\n} catch (e) {\n  throw new Error('Failed to parse outline JSON: ' + e.message);\n}"
+      },
+      "id": "parse-outline",
+      "name": "Parse Outline",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2500, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare final output with chunks info\nconst analystResult = $input.first().json.analyst_result;\nconst originalInput = $('Detect Processing Mode').first().json;\n\nreturn [{\n  json: {\n    job_id: originalInput.job_id,\n    prompt: originalInput.prompt,\n    analyst_result: analystResult,\n    chunks: originalInput.mode === 'chunked' ? $('Agent: Split Chunks').first().json.chunks : [originalInput.document_text],\n    mode: originalInput.mode,\n    word_count: originalInput.word_count\n  }\n}];"
+      },
+      "id": "prepare-output",
+      "name": "Prepare Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2720, 300]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [[{ "node": "Detect Processing Mode", "type": "main", "index": 0 }]]
+    },
+    "Detect Processing Mode": {
+      "main": [[{ "node": "Needs Chunking?", "type": "main", "index": 0 }]]
+    },
+    "Needs Chunking?": {
+      "main": [
+        [{ "node": "Agent: Split Chunks", "type": "main", "index": 0 }],
+        [{ "node": "LLM: Direct Outline", "type": "main", "index": 0 }]
+      ]
+    },
+    "Agent: Split Chunks": {
+      "main": [[{ "node": "Split Into Items", "type": "main", "index": 0 }]]
+    },
+    "Split Into Items": {
+      "main": [[{ "node": "LLM: Extract Metadata", "type": "main", "index": 0 }]]
+    },
+    "LLM: Extract Metadata": {
+      "main": [[{ "node": "Parse Extract Result", "type": "main", "index": 0 }]]
+    },
+    "Parse Extract Result": {
+      "main": [[{ "node": "Aggregate All Metadata", "type": "main", "index": 0 }]]
+    },
+    "Aggregate All Metadata": {
+      "main": [[{ "node": "Agent: Merge Metadata", "type": "main", "index": 0 }]]
+    },
+    "Agent: Merge Metadata": {
+      "main": [[{ "node": "LLM: Create Outline + Mapping", "type": "main", "index": 0 }]]
+    },
+    "LLM: Create Outline + Mapping": {
+      "main": [[{ "node": "Parse Outline", "type": "main", "index": 0 }]]
+    },
+    "LLM: Direct Outline": {
+      "main": [[{ "node": "Parse Outline", "type": "main", "index": 0 }]]
+    },
+    "Parse Outline": {
+      "main": [[{ "node": "Prepare Output", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "pptx-slides" }]
+}
