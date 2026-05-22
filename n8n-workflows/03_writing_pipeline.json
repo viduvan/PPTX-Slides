@@ -1,0 +1,139 @@
+{
+  "name": "PPTX-Slides: Writing Pipeline",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start-trigger",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://writer:8002/prepare-sections",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ job_id: $json.job_id, outline: $json.analyst_result.outline, chunk_mapping: $json.analyst_result.chunk_mapping, chunks: $json.chunks }) }}",
+        "options": { "timeout": 15000 }
+      },
+      "id": "http-prepare",
+      "name": "Agent: Prepare Sections",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 300],
+      "notesInFlow": true,
+      "notes": "POST writer:8002/prepare-sections\nMaps outline sections → original chunks\nOutput: sections[] with chunk text attached"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "sections",
+        "options": {}
+      },
+      "id": "split-sections",
+      "name": "Split Sections",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + $credentials.httpQueryAuth.value }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Viết ' + $json.num_slides + ' slides cho section: \"' + $json.section_title + '\"\\n\\nKey points cần cover:\\n' + JSON.stringify($json.key_points) + '\\n\\nNỘI DUNG GỐC (viết slides DỰA TRÊN đoạn văn này, KHÔNG tự bịa):\\n' + $json.section_text + '\\n\\nQuy tắc:\\n- Mỗi slide: title + 5-8 bullet points\\n- Mỗi bullet là câu đầy đủ 15-30 từ\\n- GIỮ NGUYÊN ngôn ngữ gốc (VN→VN, EN→EN)\\n- image_keyword bằng tiếng Anh, 2-4 từ cụ thể\\n- Mỗi slide PHẢI có image_keyword KHÁC NHAU\\n\\nTrả về JSON array:\\n[{\"slide_number\": 1, \"title\": \"...\", \"content\": \"- bullet 1\\\\n- bullet 2\\\\n...\", \"narration\": \"\", \"image_keyword\": \"Vietnam ...\"}]' }] }], generationConfig: { temperature: 0.7, responseMimeType: 'application/json' } }) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpQueryAuth",
+        "options": { "timeout": 120000 }
+      },
+      "id": "llm-write",
+      "name": "LLM: Write Slides",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 300],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CONFIGURE_ME_GEMINI",
+          "name": "Gemini API Key"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Gemini / OpenAI: Write slides from ORIGINAL text\nEach section gets its own LLM call\nParallel execution (paid API)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse LLM response → slides array\nconst response = $input.first().json;\nconst text = response.candidates?.[0]?.content?.parts?.[0]?.text || '[]';\n\ntry {\n  const slides = JSON.parse(text);\n  return [{ json: { section_slides: Array.isArray(slides) ? slides : [slides] } }];\n} catch (e) {\n  // Try to extract JSON from text\n  const match = text.match(/\\[.*\\]/s);\n  if (match) {\n    try {\n      return [{ json: { section_slides: JSON.parse(match[0]) } }];\n    } catch (e2) {}\n  }\n  return [{ json: { section_slides: [], parse_error: e.message } }];\n}"
+      },
+      "id": "parse-slides",
+      "name": "Parse Slides JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 300]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "id": "aggregate-slides",
+      "name": "Aggregate All Slides",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [1300, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://writer:8002/merge-slides",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ job_id: $json.job_id, all_section_slides: $json.data }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "http-merge",
+      "name": "Agent: Merge & Renumber",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1520, 300],
+      "notesInFlow": true,
+      "notes": "POST writer:8002/merge-slides\nDedup, renumber, validate bullet count"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare output for next pipeline\nconst merged = $input.first().json;\nreturn [{\n  json: {\n    job_id: $('Start').first().json.job_id,\n    slides: merged.slides,\n    total_slides: merged.total_slides,\n    context: $('Start').first().json.analyst_result\n  }\n}];"
+      },
+      "id": "prepare-output",
+      "name": "Prepare Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1740, 300]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [[{ "node": "Agent: Prepare Sections", "type": "main", "index": 0 }]]
+    },
+    "Agent: Prepare Sections": {
+      "main": [[{ "node": "Split Sections", "type": "main", "index": 0 }]]
+    },
+    "Split Sections": {
+      "main": [[{ "node": "LLM: Write Slides", "type": "main", "index": 0 }]]
+    },
+    "LLM: Write Slides": {
+      "main": [[{ "node": "Parse Slides JSON", "type": "main", "index": 0 }]]
+    },
+    "Parse Slides JSON": {
+      "main": [[{ "node": "Aggregate All Slides", "type": "main", "index": 0 }]]
+    },
+    "Aggregate All Slides": {
+      "main": [[{ "node": "Agent: Merge & Renumber", "type": "main", "index": 0 }]]
+    },
+    "Agent: Merge & Renumber": {
+      "main": [[{ "node": "Prepare Output", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "pptx-slides" }]
+}
