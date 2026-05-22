@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Pros / Cons</title>
+<link rel="stylesheet" href="../fonts.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" id="theme-link" href="../themes/minimal-white.css">
+<link rel="stylesheet" href="../animations/animations.css">
+<style>
+.pc{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:30px}
+.pc .card h3{display:flex;align-items:center;gap:10px}
+.pc .card h3 .b{display:inline-flex;width:36px;height:36px;border-radius:10px;align-items:center;justify-content:center;font-size:20px}
+.pc .pro h3 .b{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.pc .con h3 .b{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+.pc ul{padding-left:22px;line-height:1.8;color:var(--text-2)}
+.pc .pro{border-top:3px solid var(--good)}
+.pc .con{border-top:3px solid var(--bad)}
+</style>
+</head><body class="single">
+<div class="deck"><section class="slide is-active" data-title="Pros Cons">
+  <p class="kicker">Trade-offs · Honest trade-offs</p>
+  <h2 class="h2">Pure HTML presentations：What's good，What's painful</h2>
+  <div class="pc">
+    <div class="card pro anim-fade-up" data-anim="fade-up"><h3><span class="b">✓</span> Pros</h3>
+      <ul><li>Zero build: runs from a single file</li><li>Diffable: Git-friendly, easy to review</li><li>Programmable: fully customizable animations</li><li>Distributable: URL / PDF / PNG all work</li></ul>
+    </div>
+    <div class="card con anim-fade-up" data-anim="fade-up"><h3><span class="b">✗</span> Pain points</h3>
+      <ul><li>Collaboration is not real-time like Keynote</li><li>Steeper learning curve for non-developers</li><li>Complex animations still require writing JS</li><li>Some fonts missing in offline environments</li></ul>
+    </div>
+  </div>
+</section></div>
+<script src="../runtime.js"></script>
+</body></html>

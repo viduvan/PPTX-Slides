@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Two Column</title>
+<link rel="stylesheet" href="../fonts.css">
+<link rel="stylesheet" href="../base.css">
+<link rel="stylesheet" id="theme-link" href="../themes/minimal-white.css">
+<link rel="stylesheet" href="../animations/animations.css">
+</head><body class="single">
+<div class="deck"><section class="slide is-active" data-title="Two column">
+  <p class="kicker">Pattern · Two columns</p>
+  <h2 class="h2">Concept <span class="dim2">⟷</span> Example</h2>
+  <div class="grid g2 mt-l" style="align-items:start">
+    <div class="card anim-fade-left" data-anim="fade-left">
+      <h3>Left · Concept</h3>
+      <p class="dim">One theme = a set of CSS variables. Colors, fonts, radius, shadows all go in <code>:root</code>.</p>
+      <ul class="mt-m">
+        <li>— Tokens define semantics, no hardcoded colors</li>
+        <li>— base.css uses tokens for layout</li>
+        <li>— Each theme only changes variables</li>
+      </ul>
+    </div>
+    <div class="card anim-fade-right" data-anim="fade-right">
+      <h3>Right · Example</h3>
+<pre class="mono" style="font-size:13px;background:var(--surface-2);padding:14px;border-radius:var(--radius-sm);overflow:auto">
+:root {
+  --bg: #fff;
+  --text-1: #0c0d10;
+  --accent: #3b6cff;
+  --radius: 18px;
+}
+.card {
+  background: var(--bg);
+  color: var(--text-1);
+  border-radius: var(--radius);
+}</pre>
+    </div>
+  </div>
+</section></div>
+<script src="../runtime.js"></script>
+</body></html>
