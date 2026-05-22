@@ -11,6 +11,7 @@ const API_BASE = window.location.origin;
 // ── State ──────────────────────────────────────────────────
 const state = {
     sessionId: null,
+    jobId: null,
     slides: [],
     slideImages: [],
     currentSlideIndex: 0,
@@ -18,6 +19,8 @@ const state = {
     wordContent: '',
     isLoading: false,
     selectedTheme: 'auto',
+    pptxPath: '',
+    htmlPath: '',
 };
 
 // ── DOM Elements ───────────────────────────────────────────
@@ -267,29 +270,7 @@ async function generateSlides() {
         updateGenProgress(displayPct);
     }, 800);
 
-    // Server progress polling (for chunked generation)
-    let polling = true;
-    const pollProgress = async () => {
-        while (polling) {
-            await new Promise(r => setTimeout(r, 2000));
-            if (!polling) break;
-            try {
-                const res = await fetch(`${API_BASE}/api/slides/progress/${progressId}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.status === 'generating' || data.status === 'starting') {
-                        serverPct = data.percent;
-                        dom.loadingText.textContent = data.message || 'Đang tạo slides...';
-                    } else if (data.status === 'complete') {
-                        serverPct = 100;
-                        dom.loadingText.textContent = data.message || 'Hoàn tất!';
-                    }
-                }
-            } catch (e) { /* ignore */ }
-        }
-    };
-    pollProgress();
-
+    // Step 1: Trigger the async pipeline
     try {
         const res = await fetch(`${API_BASE}/api/slides/generate`, {
             method: 'POST',
@@ -298,22 +279,74 @@ async function generateSlides() {
                 prompt,
                 word_content: state.wordContent,
                 theme: state.selectedTheme,
-                progress_id: progressId,
+                output_format: 'both',
             }),
         });
 
-        polling = false;
-        clearInterval(simTimer);
-
         if (!res.ok) {
             const err = await res.json();
-            throw new Error(err.detail || 'Generation failed');
+            clearInterval(simTimer);
+            throw new Error(err.detail || 'Pipeline trigger failed');
         }
 
         const data = await res.json();
-        state.sessionId = data.session_id;
-        state.slides = data.slides;
+        state.jobId = data.job_id;
+        dom.loadingText.textContent = 'Pipeline started...';
 
+        // Step 2: Poll job status until done
+        let polling = true;
+        while (polling) {
+            await new Promise(r => setTimeout(r, 2500));
+            try {
+                const statusRes = await fetch(`${API_BASE}/api/jobs/${state.jobId}`);
+                if (statusRes.ok) {
+                    const job = await statusRes.json();
+                    serverPct = job.progress_pct || 0;
+                    const displayPct = Math.round(Math.max(simPct, serverPct));
+                    updateGenProgress(displayPct);
+
+                    const statusMap = {
+                        'queued': 'Waiting in queue...',
+                        'analyzing': 'Analyzing document...',
+                        'writing': 'Writing slide content...',
+                        'designing': 'Designing visuals...',
+                        'exporting': 'Building presentation files...',
+                        'done': 'Complete!',
+                        'error': 'Error occurred',
+                    };
+                    dom.loadingText.textContent = statusMap[job.status] || job.status;
+
+                    if (job.status === 'done') {
+                        polling = false;
+                        state.sessionId = state.jobId;
+                        state.pptxPath = job.pptx_path;
+                        state.htmlPath = job.html_path;
+                        state.slides = [];
+                        // Create slide data from slide_count
+                        for (let i = 1; i <= (job.slide_count || 1); i++) {
+                            state.slides.push({
+                                slide_number: i,
+                                title: `Slide ${i}`,
+                                content: '',
+                                narration: '',
+                                image_keyword: '',
+                            });
+                        }
+                    } else if (job.status === 'error') {
+                        polling = false;
+                        throw new Error(job.error || 'Pipeline failed');
+                    }
+                }
+            } catch (e) {
+                if (e.message.includes('Pipeline failed') || e.message.includes('Error')) {
+                    polling = false;
+                    throw e;
+                }
+                // Network error, keep polling
+            }
+        }
+
+        clearInterval(simTimer);
         updateGenProgress(100);
         renderSlides();
         hideLoading();
@@ -443,10 +476,12 @@ async function downloadSlides() {
     setStatus(t('status.downloading'), 'loading');
 
     try {
-        const res = await fetch(`${API_BASE}/api/slides/${state.sessionId}/download`);
+        // Download PPTX from the pipeline
+        const jobId = state.jobId || state.sessionId;
+        const res = await fetch(`${API_BASE}/api/download/${jobId}/pptx`);
 
         if (!res.ok) {
-            const err = await res.json();
+            const err = await res.json().catch(() => ({ detail: 'Download failed' }));
             throw new Error(err.detail || 'Download failed');
         }
 
@@ -454,7 +489,7 @@ async function downloadSlides() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'slides_presentation_VietPV.pptx';
+        a.download = `presentation_${jobId}.pptx`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -472,6 +507,29 @@ async function downloadSlides() {
         btn.classList.remove('is-downloading');
         btn.disabled = false;
         btn.removeAttribute('data-loading-text');
+    }
+}
+
+async function downloadHtml() {
+    const jobId = state.jobId || state.sessionId;
+    if (!jobId) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/download/${jobId}/html`);
+        if (!res.ok) throw new Error('HTML not available');
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `presentation_${jobId}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('HTML presentation downloaded!', 'success');
+    } catch (err) {
+        showToast(`HTML download failed: ${err.message}`, 'error');
     }
 }
 
@@ -523,20 +581,26 @@ function renderSlides() {
 }
 
 async function fetchSlideThumbnails() {
-    if (!state.sessionId) return;
+    const jobId = state.jobId || state.sessionId;
+    if (!jobId) return;
 
     try {
-        const res = await fetch(`${API_BASE}/api/slides/${state.sessionId}/thumbnails`);
-        if (!res.ok) throw new Error('Thumbnail fetch failed');
+        // Try loading thumbnails for each slide from the pipeline
+        const newSlides = [];
+        const total = state.slides.length;
 
-        const data = await res.json();
-        const newSlides = data.slides || [];
-        const total = data.total || state.slides.length;
+        for (let i = 1; i <= total; i++) {
+            const url = `${API_BASE}/api/thumbnails/${jobId}/${i}`;
+            try {
+                const res = await fetch(url, { method: 'HEAD' });
+                if (res.ok) {
+                    newSlides.push({ slide_number: i, image_url: url });
+                }
+            } catch (e) { /* thumbnail not ready yet */ }
+        }
 
-        // Update available thumbnails
         state.slideImages = newSlides;
 
-        // Show current slide image if available (behind the loading overlay)
         if (newSlides.length > 0) {
             const idx = state.currentSlideIndex;
             const slideData = (idx < newSlides.length) ? newSlides[idx] : newSlides[0];
@@ -545,27 +609,22 @@ async function fetchSlideThumbnails() {
             updateNavButtons();
         }
 
-        // Still generating — use MAX of simulated and real progress
-        if (data.status === 'generating') {
-            const realPct = total > 0 ? Math.round((newSlides.length / total) * 100) : 0;
+        // Still generating thumbnails
+        if (newSlides.length < total && newSlides.length > 0) {
+            const realPct = Math.round((newSlides.length / total) * 100);
             const displayPct = Math.round(Math.max(_thumbSimPct, realPct));
             updateProgressRing(displayPct);
             dom.slideLoading.hidden = false;
-
-            if (newSlides.length === 0) {
-                dom.progressLabel.textContent = 'Đang tải slide...';
-            } else {
-                dom.progressLabel.textContent =
-                    `Đang tải slide... ${newSlides.length} / ${total}`;
-            }
-            setTimeout(() => fetchSlideThumbnails(), 1500);
+            dom.progressLabel.textContent =
+                `Loading slides... ${newSlides.length} / ${total}`;
+            setTimeout(() => fetchSlideThumbnails(), 2000);
             return;
         }
 
         // All done — stop simulated timer, show 100%
         if (_thumbSimTimer) { clearInterval(_thumbSimTimer); _thumbSimTimer = null; }
         updateProgressRing(100);
-        dom.progressLabel.textContent = `Hoàn tất ${total} slides`;
+        dom.progressLabel.textContent = `Complete — ${total} slides`;
         setTimeout(() => {
             dom.slideLoading.hidden = true;
             updateSlideCounter();
