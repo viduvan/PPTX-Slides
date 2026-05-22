@@ -93,7 +93,7 @@ services:
     deploy:
       replicas: ${N8N_WORKER_REPLICAS:-3}
 
-  # ─── PPTX AGENT SERVICES (data processors, no LLM) ─────
+  # ─── API GATEWAY (thin proxy, no LLM) ────────────────────
   api:
     build: ./docker/api
     container_name: pptx-slides-api
@@ -104,17 +104,19 @@ services:
       - .env
     environment:
       - DATABASE_URL=postgresql://${DB_POSTGRESDB_USER:-pptx}:${DB_POSTGRESDB_PASSWORD:-pptx}@postgres:5432/${DB_POSTGRESDB_DATABASE:-pptx_slides}
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-redis123}@redis:6379
       - N8N_WEBHOOK_URL=http://n8n:5678/webhook
+      - FRONTEND_DIR=/app/frontend
     volumes:
       - shared_data:/data
+      - ./frontend:/app/frontend:ro
+      - ./html-assets:/app/html-assets:ro
     networks:
       - pptx-slides-network
     depends_on:
       - postgres
-      - redis
       - n8n
 
+  # ─── AGENT SERVICES (data processors, no LLM) ─────────────
   analyst:
     build: ./docker/analyst
     container_name: pptx-slides-analyst
