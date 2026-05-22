@@ -1,0 +1,150 @@
+{
+  "name": "PPTX-Slides: Design Pipeline",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start-trigger",
+      "name": "Start",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build prompt with all slide info for layout selection\nconst slides = $json.slides;\nconst slidesSummary = slides.map((s, i) => \n  `Slide ${i+1}: \"${s.title}\" — ${(s.content || '').substring(0, 100)}...`\n).join('\\n');\n\nconst layoutList = 'cover, section-header, bullets, two-column, comparison, pros-cons, timeline, roadmap, stat-highlight, kpi-grid, quote, image-full, image-left, image-right, code, terminal, table, chart-placeholder, mindmap, pyramid, funnel, process-steps, checklist, team-grid, pricing, faq, demo, video-embed, closing, thank-you, contact';\n\nreturn [{\n  json: {\n    ...($input.first().json),\n    slides_summary: slidesSummary,\n    layout_list: layoutList\n  }\n}];"
+      },
+      "id": "build-prompt",
+      "name": "Build Layout Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + $credentials.httpQueryAuth.value }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Cho mỗi slide dưới đây, chọn layout phù hợp nhất.\\n\\nDanh sách layouts: ' + $json.layout_list + '\\n\\nSlides:\\n' + $json.slides_summary + '\\n\\nTrả về JSON array: [{\"slide_index\": 0, \"layout\": \"cover\"}, {\"slide_index\": 1, \"layout\": \"bullets\"}, ...]' }] }], generationConfig: { temperature: 0.2, responseMimeType: 'application/json' } }) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpQueryAuth",
+        "options": { "timeout": 30000 }
+      },
+      "id": "llm-layout",
+      "name": "LLM: Select Layouts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 300],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "CONFIGURE_ME_GEMINI",
+          "name": "Gemini API Key"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Gemini Flash: Select best layout\nfor each slide from 31 options"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse layout selection\nconst response = $input.first().json;\nconst text = response.candidates?.[0]?.content?.parts?.[0]?.text || '[]';\nlet layouts = [];\ntry { layouts = JSON.parse(text); } catch(e) { layouts = []; }\nreturn [{ json: { ...($('Build Layout Prompt').first().json), layouts } }];"
+      },
+      "id": "parse-layouts",
+      "name": "Parse Layouts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [{
+            "id": "theme-check",
+            "leftValue": "={{ $json.context?.theme_suggestion }}",
+            "rightValue": "auto",
+            "operator": { "type": "string", "operation": "equals" }
+          }],
+          "combinator": "and"
+        }
+      },
+      "id": "if-auto-theme",
+      "name": "Auto Theme?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + $credentials.httpQueryAuth.value }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Cho presentation về chủ đề: ' + ($json.context?.topic || 'general') + '\\nChọn 1 theme phù hợp nhất từ danh sách: midnight, ocean, forest, sunset, crimson, emerald_gold, rose, dark_purple, corporate_blue, cyber_punk, pastel_dream, aurora, volcano, arctic, desert_sand, lavender, neon_city, bamboo_zen, royal_gold, slate_minimal\\n\\nTrả về JSON: {\"theme\": \"theme_name\", \"reason\": \"lý do\"}' }] }], generationConfig: { temperature: 0.3, responseMimeType: 'application/json' } }) }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpQueryAuth",
+        "options": { "timeout": 15000 }
+      },
+      "id": "llm-theme",
+      "name": "LLM: Select Theme",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 200],
+      "credentials": {
+        "httpQueryAuth": { "id": "CONFIGURE_ME_GEMINI", "name": "Gemini API Key" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Use user-selected theme\nreturn [{ json: { ...($input.first().json), selected_theme: $json.context?.theme_suggestion || 'midnight' } }];"
+      },
+      "id": "use-user-theme",
+      "name": "Use User Theme",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://designer:8003/fetch-images",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ job_id: $json.job_id, slides: $json.slides, document_topic: $json.context?.topic || '' }) }}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "http-images",
+      "name": "Agent: Fetch Images",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1600, 300],
+      "notesInFlow": true,
+      "notes": "POST designer:8003/fetch-images\nPixabay + Wikimedia Commons\nParallel image fetching"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine layouts + theme + images → visual_specs\nconst images = $input.first().json;\nreturn [{\n  json: {\n    job_id: $('Start').first().json.job_id,\n    slides: $('Start').first().json.slides,\n    visual_specs: {\n      theme: images.theme || 'midnight',\n      layouts: $('Parse Layouts').first().json.layouts,\n      images: images.image_paths || {}\n    }\n  }\n}];"
+      },
+      "id": "merge-specs",
+      "name": "Merge Visual Specs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1840, 300]
+    }
+  ],
+  "connections": {
+    "Start": { "main": [[{ "node": "Build Layout Prompt", "type": "main", "index": 0 }]] },
+    "Build Layout Prompt": { "main": [[{ "node": "LLM: Select Layouts", "type": "main", "index": 0 }]] },
+    "LLM: Select Layouts": { "main": [[{ "node": "Parse Layouts", "type": "main", "index": 0 }]] },
+    "Parse Layouts": { "main": [[{ "node": "Auto Theme?", "type": "main", "index": 0 }]] },
+    "Auto Theme?": {
+      "main": [
+        [{ "node": "LLM: Select Theme", "type": "main", "index": 0 }],
+        [{ "node": "Use User Theme", "type": "main", "index": 0 }]
+      ]
+    },
+    "LLM: Select Theme": { "main": [[{ "node": "Agent: Fetch Images", "type": "main", "index": 0 }]] },
+    "Use User Theme": { "main": [[{ "node": "Agent: Fetch Images", "type": "main", "index": 0 }]] },
+    "Agent: Fetch Images": { "main": [[{ "node": "Merge Visual Specs", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "pptx-slides" }]
+}
