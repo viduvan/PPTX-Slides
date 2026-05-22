@@ -26,19 +26,27 @@ CREATE TABLE IF NOT EXISTS sessions (
 -- Jobs: tracks each pipeline execution through agents
 CREATE TABLE IF NOT EXISTS jobs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    session_id UUID REFERENCES sessions(id) ON DELETE CASCADE,
-    status VARCHAR(20) DEFAULT 'pending',
+    job_id VARCHAR(100) UNIQUE NOT NULL,
+    session_id UUID REFERENCES sessions(id) ON DELETE SET NULL,
+    status VARCHAR(20) DEFAULT 'queued',
     current_agent VARCHAR(20),
     progress_pct INT DEFAULT 0,
     progress_message TEXT DEFAULT '',
     error_message TEXT,
+    -- Input
+    prompt TEXT DEFAULT '',
+    output_format VARCHAR(20) DEFAULT 'pptx',
+    -- Output paths (on shared volume)
+    pptx_path VARCHAR(500),
+    html_path VARCHAR(500),
+    thumbnail_paths JSONB,
+    slide_count INT DEFAULT 0,
     -- Agent results stored as JSONB
     analyst_result JSONB,
     writer_result JSONB,
     designer_result JSONB,
     exporter_result JSONB,
     -- Config
-    output_format VARCHAR(20) DEFAULT 'pptx',
     llm_provider VARCHAR(50),
     -- Timestamps
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -60,6 +68,7 @@ CREATE TABLE IF NOT EXISTS documents (
 );
 
 -- Indexes for common queries
+CREATE INDEX IF NOT EXISTS idx_jobs_job_id ON jobs(job_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_session ON jobs(session_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 CREATE INDEX IF NOT EXISTS idx_documents_session ON documents(session_id);
