@@ -233,7 +233,7 @@ async def generate_slides(req: GenerateRequest):
             async with session.post(
                 f"{N8N_WEBHOOK_URL}/pptx-generate",
                 json=payload,
-                timeout=aiohttp.ClientTimeout(total=10),
+                timeout=aiohttp.ClientTimeout(total=30),
             ) as resp:
                 if resp.status not in (200, 201):
                     body = await resp.text()
