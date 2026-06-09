@@ -61,3 +61,6 @@ Thumbs.db
 htmlcov/
 
 
+.claude/
+.clinerules/
+database/
