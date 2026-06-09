@@ -286,7 +286,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE pptx_app.jobs SET status='done', progress_pct=100, progress_message='Hoàn tất!', exporter_result='{{ JSON.stringify($json.file_paths) }}'::jsonb, completed_at=NOW() WHERE job_id='{{ $json.job_id }}'",
+        "query": "UPDATE pptx_app.jobs SET status='done', progress_pct=100, progress_message='Hoàn tất!', exporter_result='{{ JSON.stringify($json.file_paths) }}'::jsonb, pptx_path='{{ $json.file_paths.pptx_path || \"\" }}', html_path='{{ $json.file_paths.html_path || \"\" }}', thumbnail_paths='{{ JSON.stringify($json.file_paths.thumbnail_paths || []) }}'::jsonb, slide_count={{ ($json.file_paths.thumbnail_paths || []).length }}, completed_at=NOW() WHERE job_id='{{ $json.job_id }}'",
         "options": {}
       },
       "id": "db-complete",
