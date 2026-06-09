@@ -1,28 +1,32 @@
 {
+  "id": "cdjb8COYSJaYr6Io",
   "name": "PPTX-Slides: Writing Pipeline",
   "nodes": [
     {
-      "parameters": {},
+      "parameters": {
+        "inputSource": "passthrough"
+      },
       "id": "start-trigger",
       "name": "Start",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
-      "position": [200, 300]
+      "position": [
+        200,
+        300
+      ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "http://writer:8002/prepare-sections",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ job_id: $json.job_id, outline: $json.analyst_result.outline, chunk_mapping: $json.analyst_result.chunk_mapping, chunks: $json.chunks }) }}",
-        "options": { "timeout": 15000 }
+        "jsCode": "// Prepare sections - map outline sections to their chunk text\nconst input = $input.first().json;\nconst outline = (input.analyst_result || {}).outline || [];\nconst chunkMapping = (input.analyst_result || {}).chunk_mapping || {};\nconst chunks = input.chunks || [];\nconst jobId = input.job_id || '';\nconst prompt = input.prompt || '';\n\n// If no chunks provided, use the prompt as the source text\nconst effectiveChunks = chunks.length > 0 ? chunks : [prompt];\n\nconst sections = [];\nfor (const section of outline) {\n  const sectionId = String(section.section_id || 0);\n  const mappedChunkIds = chunkMapping[sectionId] || [];\n\n  let sectionTextParts = [];\n  for (const cid of mappedChunkIds) {\n    const idx = parseInt(cid);\n    if (idx >= 0 && idx < effectiveChunks.length) {\n      sectionTextParts.push(effectiveChunks[idx]);\n    }\n  }\n\n  // If no mapping, assign based on position\n  if (sectionTextParts.length === 0) {\n    const totalSections = outline.length;\n    const totalChunks = effectiveChunks.length;\n    if (totalChunks > 0 && totalSections > 0) {\n      const start = Math.floor(parseInt(sectionId) * totalChunks / totalSections);\n      const end = Math.floor((parseInt(sectionId) + 1) * totalChunks / totalSections);\n      sectionTextParts = effectiveChunks.slice(start, Math.max(start + 1, end));\n    }\n  }\n\n  const sectionText = sectionTextParts.join('\\n\\n');\n  sections.push({\n    section_id: section.section_id || 0,\n    section_title: section.title || '',\n    num_slides: section.slides || 2,\n    key_points: section.key_points || [],\n    section_text: sectionText,\n    chunk_ids: mappedChunkIds,\n    text_word_count: sectionText.split(' ').length,\n  });\n}\n\nreturn [{\n  json: {\n    job_id: jobId,\n    sections: sections\n  }\n}];"
       },
       "id": "http-prepare",
       "name": "Agent: Prepare Sections",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [420, 300],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        300
+      ],
       "notesInFlow": true,
       "notes": "POST writer:8002/prepare-sections\nMaps outline sections → original chunks\nOutput: sections[] with chunk text attached"
     },
@@ -35,42 +39,62 @@
       "name": "Split Sections",
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
-      "position": [640, 300]
+      "position": [
+        640,
+        300
+      ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{ 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + $credentials.httpQueryAuth.value }}",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Viết ' + $json.num_slides + ' slides cho section: \"' + $json.section_title + '\"\\n\\nKey points cần cover:\\n' + JSON.stringify($json.key_points) + '\\n\\nNỘI DUNG GỐC (viết slides DỰA TRÊN đoạn văn này, KHÔNG tự bịa):\\n' + $json.section_text + '\\n\\nQuy tắc:\\n- Mỗi slide: title + 5-8 bullet points\\n- Mỗi bullet là câu đầy đủ 15-30 từ\\n- GIỮ NGUYÊN ngôn ngữ gốc (VN→VN, EN→EN)\\n- image_keyword bằng tiếng Anh, 2-4 từ cụ thể\\n- Mỗi slide PHẢI có image_keyword KHÁC NHAU\\n\\nTrả về JSON array:\\n[{\"slide_number\": 1, \"title\": \"...\", \"content\": \"- bullet 1\\\\n- bullet 2\\\\n...\", \"narration\": \"\", \"image_keyword\": \"Vietnam ...\"}]' }] }], generationConfig: { temperature: 0.7, responseMimeType: 'application/json' } }) }}",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "httpQueryAuth",
-        "options": { "timeout": 120000 }
+        "promptType": "define",
+        "text": "={{ 'Viết ' + $json.num_slides + ' slides cho section: \"' + $json.section_title + '\"\\n\\nKey points cần cover:\\n' + JSON.stringify($json.key_points) + '\\n\\nNỘI DUNG GỐC (viết slides DỰA TRÊN đoạn văn này, KHÔNG tự bịa):\\n' + $json.section_text + '\\n\\nQuy tắc:\\n- Mỗi slide: title + 5-8 bullet points\\n- Mỗi bullet là câu đầy đủ 15-30 từ\\n- GIỮ NGUYÊN ngôn ngữ gốc (VN→VN, EN→EN)\\n- image_keyword bằng tiếng Anh, 2-4 từ cụ thể\\n- Mỗi slide PHẢI có image_keyword KHÁC NHAU\\n\\nTrả về JSON array:\\n[{\"slide_number\": 1, \"title\": \"...\", \"content\": \"- bullet 1\\\\n- bullet 2\\\\n...\", \"narration\": \"\", \"image_keyword\": \"Vietnam ...\"}]' }}",
+        "options": {}
       },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        860,
+        300
+      ],
       "id": "llm-write",
-      "name": "LLM: Write Slides",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [860, 300],
-      "credentials": {
-        "httpQueryAuth": {
-          "id": "CONFIGURE_ME_GEMINI",
-          "name": "Gemini API Key"
-        }
-      },
-      "notesInFlow": true,
-      "notes": "Gemini / OpenAI: Write slides from ORIGINAL text\nEach section gets its own LLM call\nParallel execution (paid API)"
+      "name": "LLM: Write Slides"
     },
     {
       "parameters": {
-        "jsCode": "// Parse LLM response → slides array\nconst response = $input.first().json;\nconst text = response.candidates?.[0]?.content?.parts?.[0]?.text || '[]';\n\ntry {\n  const slides = JSON.parse(text);\n  return [{ json: { section_slides: Array.isArray(slides) ? slides : [slides] } }];\n} catch (e) {\n  // Try to extract JSON from text\n  const match = text.match(/\\[.*\\]/s);\n  if (match) {\n    try {\n      return [{ json: { section_slides: JSON.parse(match[0]) } }];\n    } catch (e2) {}\n  }\n  return [{ json: { section_slides: [], parse_error: e.message } }];\n}"
+        "model": {
+          "__rl": true,
+          "value": "Qwen3-32B",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        680,
+        480
+      ],
+      "id": "2f0fee66-0839-49c8-9513-804d908b745a",
+      "name": "Model for LLM: Write Slides",
+      "credentials": {
+        "openAiApi": {
+          "id": "6qStVbBDBo75jLqY",
+          "name": "FPT CL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse LLM response → slides array\nconst response = $input.first().json;\nconst text = response.output || '[]';\n\ntry {\n  const slides = JSON.parse(text.replace(/```json\\n?|```/g, \"\"));\n  return [{ json: { section_slides: Array.isArray(slides) ? slides : [slides] } }];\n} catch (e) {\n  // Try to extract JSON from text\n  const match = text.match(/\\[[\\s\\S]*\\]/);\n  if (match) {\n    try {\n      return [{ json: { section_slides: JSON.parse(match[0]) } }];\n    } catch (e2) {}\n  }\n  return [{ json: { section_slides: [], parse_error: e.message } }];\n}"
       },
       "id": "parse-slides",
       "name": "Parse Slides JSON",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1080, 300]
+      "position": [
+        1080,
+        300
+      ]
     },
     {
       "parameters": {
@@ -81,59 +105,138 @@
       "name": "Aggregate All Slides",
       "type": "n8n-nodes-base.aggregate",
       "typeVersion": 1,
-      "position": [1300, 300]
+      "position": [
+        1300,
+        300
+      ]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "http://writer:8002/merge-slides",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ job_id: $json.job_id, all_section_slides: $json.data }) }}",
-        "options": { "timeout": 10000 }
+        "jsCode": "// Merge and renumber slides from all sections\nconst input = $input.first().json;\nconst allSectionSlides = input.data || input || [];\nconst jobId = $('Agent: Prepare Sections').first().json.job_id || '';\n\nlet allSlides = [];\nif (Array.isArray(allSectionSlides)) {\n  for (const sectionData of allSectionSlides) {\n    const sectionSlides = sectionData.section_slides || sectionData.slides || [];\n    if (Array.isArray(sectionSlides)) {\n      allSlides.push(...sectionSlides);\n    }\n  }\n}\n\n// Deduplicate by title\nconst seenTitles = new Set();\nconst uniqueSlides = [];\nfor (const slide of allSlides) {\n  const title = (slide.title || '').trim().toLowerCase();\n  if (title && seenTitles.has(title)) continue;\n  if (title) seenTitles.add(title);\n  uniqueSlides.push(slide);\n}\n\n// Renumber\nfor (let i = 0; i < uniqueSlides.length; i++) {\n  uniqueSlides[i].slide_number = i + 1;\n}\n\nreturn [{\n  json: {\n    job_id: jobId,\n    slides: uniqueSlides,\n    total_slides: uniqueSlides.length\n  }\n}];"
       },
       "id": "http-merge",
       "name": "Agent: Merge & Renumber",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [1520, 300],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        300
+      ],
       "notesInFlow": true,
       "notes": "POST writer:8002/merge-slides\nDedup, renumber, validate bullet count"
     },
     {
       "parameters": {
-        "jsCode": "// Prepare output for next pipeline\nconst merged = $input.first().json;\nreturn [{\n  json: {\n    job_id: $('Start').first().json.job_id,\n    slides: merged.slides,\n    total_slides: merged.total_slides,\n    context: $('Start').first().json.analyst_result\n  }\n}];"
+        "jsCode": "// Prepare output for next pipeline\nconst merged = $input.first().json;\nreturn [{\n  json: {\n    job_id: $('Start').first().json.job_id,\n    slides: merged.slides,\n    total_slides: merged.total_slides,\n    output_format: $('Start').first().json.output_format,\n    context: $('Start').first().json.analyst_result\n  }\n}];"
       },
       "id": "prepare-output",
       "name": "Prepare Output",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1740, 300]
+      "position": [
+        1740,
+        300
+      ]
     }
   ],
   "connections": {
     "Start": {
-      "main": [[{ "node": "Agent: Prepare Sections", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Agent: Prepare Sections",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Agent: Prepare Sections": {
-      "main": [[{ "node": "Split Sections", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Split Sections",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Split Sections": {
-      "main": [[{ "node": "LLM: Write Slides", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "LLM: Write Slides",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "LLM: Write Slides": {
-      "main": [[{ "node": "Parse Slides JSON", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Parse Slides JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Parse Slides JSON": {
-      "main": [[{ "node": "Aggregate All Slides", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Aggregate All Slides",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Aggregate All Slides": {
-      "main": [[{ "node": "Agent: Merge & Renumber", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Agent: Merge & Renumber",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Agent: Merge & Renumber": {
-      "main": [[{ "node": "Prepare Output", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Prepare Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Model for LLM: Write Slides": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "LLM: Write Slides",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "settings": { "executionOrder": "v1" },
-  "tags": [{ "name": "pptx-slides" }]
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "pptx-slides"
+    }
+  ],
+  "active": false,
+  "pinData": {}
 }
