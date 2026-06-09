@@ -1,13 +1,19 @@
 {
+  "id": "eOIrS1fj02rkj62q",
   "name": "PPTX-Slides: Export Pipeline",
   "nodes": [
     {
-      "parameters": {},
+      "parameters": {
+        "inputSource": "passthrough"
+      },
       "id": "start-trigger",
       "name": "Start",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1.1,
-      "position": [200, 300]
+      "position": [
+        200,
+        300
+      ]
     },
     {
       "parameters": {
@@ -15,34 +21,53 @@
         "url": "http://exporter:8004/build-pptx",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ job_id: $json.job_id, slides: $json.slides, visual_specs: $json.visual_specs }) }}",
-        "options": { "timeout": 120000 }
+        "jsonBody": "={{ JSON.stringify({ job_id: $('Start').first().json.job_id, slides: $('Start').first().json.slides, visual_specs: $('Start').first().json.visual_specs }) }}",
+        "options": {
+          "timeout": 120000
+        }
       },
       "id": "http-pptx",
       "name": "Agent: Build PPTX",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [420, 200],
+      "position": [
+        420,
+        200
+      ],
       "notesInFlow": true,
       "notes": "POST exporter:8004/build-pptx\npython-pptx template builder"
     },
     {
       "parameters": {
         "conditions": {
-          "conditions": [{
-            "id": "html-check",
-            "leftValue": "={{ $json.output_format }}",
-            "rightValue": "both",
-            "operator": { "type": "string", "operation": "equals" }
-          }],
-          "combinator": "and"
+          "conditions": [
+            {
+              "id": "html-check",
+              "leftValue": "={{ $('Start').first().json.output_format }}",
+              "rightValue": "both",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and",
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          }
         }
       },
       "id": "if-html",
       "name": "Also HTML?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [420, 420]
+      "position": [
+        420,
+        420
+      ]
     },
     {
       "parameters": {
@@ -50,14 +75,19 @@
         "url": "http://exporter:8004/build-html",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ job_id: $json.job_id, slides: $json.slides, visual_specs: $json.visual_specs }) }}",
-        "options": { "timeout": 60000 }
+        "jsonBody": "={{ JSON.stringify({ job_id: $('Start').first().json.job_id, slides: $('Start').first().json.slides, visual_specs: $('Start').first().json.visual_specs }) }}",
+        "options": {
+          "timeout": 60000
+        }
       },
       "id": "http-html",
       "name": "Agent: Build HTML",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 420],
+      "position": [
+        660,
+        420
+      ],
       "notesInFlow": true,
       "notes": "POST exporter:8004/build-html\nhtml-ppt-skill templates"
     },
@@ -67,14 +97,19 @@
         "url": "http://exporter:8004/thumbnails",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ job_id: $json.job_id, pptx_path: $json.pptx_path }) }}",
-        "options": { "timeout": 180000 }
+        "jsonBody": "={{ JSON.stringify({ job_id: $('Start').first().json.job_id, pptx_path: $('Agent: Build PPTX').first().json.pptx_path }) }}",
+        "options": {
+          "timeout": 180000
+        }
       },
       "id": "http-thumb",
       "name": "Agent: Thumbnails",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [700, 200],
+      "position": [
+        700,
+        200
+      ],
       "notesInFlow": true,
       "notes": "POST exporter:8004/thumbnails\nLibreOffice → PDF → PNG (async)"
     },
@@ -86,32 +121,89 @@
       "name": "Collect File Paths",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [960, 300]
+      "position": [
+        960,
+        300
+      ]
     }
   ],
   "connections": {
     "Start": {
-      "main": [[
-        { "node": "Agent: Build PPTX", "type": "main", "index": 0 },
-        { "node": "Also HTML?", "type": "main", "index": 0 }
-      ]]
+      "main": [
+        [
+          {
+            "node": "Agent: Build PPTX",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Also HTML?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Agent: Build PPTX": {
-      "main": [[{ "node": "Agent: Thumbnails", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Agent: Thumbnails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Also HTML?": {
       "main": [
-        [{ "node": "Agent: Build HTML", "type": "main", "index": 0 }],
-        []
+        [
+          {
+            "node": "Agent: Build HTML",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Collect File Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Agent: Thumbnails": {
-      "main": [[{ "node": "Collect File Paths", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Collect File Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Agent: Build HTML": {
-      "main": [[{ "node": "Collect File Paths", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Collect File Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "settings": { "executionOrder": "v1" },
-  "tags": [{ "name": "pptx-slides" }]
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "pptx-slides"
+    }
+  ],
+  "active": false,
+  "pinData": {}
 }
