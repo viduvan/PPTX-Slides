@@ -268,7 +268,7 @@ async def get_job_status(job_id: str):
             row = await conn.fetchrow(
                 """
                 SELECT job_id, status, progress_pct, pptx_path, html_path,
-                       thumbnail_paths, error_message, slide_count
+                       thumbnail_paths, error_message, slide_count, exporter_result
                 FROM pptx_app.jobs WHERE job_id = $1
                 """,
                 job_id,
@@ -284,9 +284,30 @@ async def get_job_status(job_id: str):
     if row["thumbnail_paths"]:
         import json
         try:
-            thumb_paths = json.loads(row["thumbnail_paths"])
+            thumb_paths = json.loads(row["thumbnail_paths"]) if isinstance(row["thumbnail_paths"], str) else row["thumbnail_paths"]
         except (json.JSONDecodeError, TypeError):
             pass
+
+    slide_count = row["slide_count"] or 0
+    # Fallback to parsing exporter_result or thumbnail_paths if slide_count is 0
+    if not slide_count:
+        if thumb_paths:
+            slide_count = len(thumb_paths)
+        elif row["exporter_result"]:
+            import json
+            try:
+                exp_res = row["exporter_result"]
+                if isinstance(exp_res, str):
+                    exp_res = json.loads(exp_res)
+                if exp_res and "file_paths" in exp_res:
+                    file_paths = exp_res["file_paths"]
+                    if isinstance(file_paths, dict):
+                        if "thumbnail_paths" in file_paths:
+                            slide_count = len(file_paths["thumbnail_paths"])
+                        elif "thumbnails" in file_paths:
+                            slide_count = len(file_paths["thumbnails"])
+            except Exception as e:
+                logger.warning(f"Failed to extract slide_count from exporter_result: {e}")
 
     return JobStatus(
         job_id=row["job_id"],
@@ -296,7 +317,7 @@ async def get_job_status(job_id: str):
         html_path=row["html_path"] or "",
         thumbnail_paths=thumb_paths,
         error=row["error_message"] or "",
-        slide_count=row["slide_count"] or 0,
+        slide_count=slide_count,
     )
 
 
@@ -335,7 +356,7 @@ async def download_file(job_id: str, format: str):
     )
 
 
-@app.get("/api/thumbnails/{job_id}/{slide_num}", tags=["Thumbnails"])
+@app.api_route("/api/thumbnails/{job_id}/{slide_num}", methods=["GET", "HEAD"], tags=["Thumbnails"])
 async def get_thumbnail(job_id: str, slide_num: int):
     """Serve a slide thumbnail image."""
     thumb_dir = SHARED_DATA_DIR / "thumbnails" / job_id
@@ -348,29 +369,147 @@ async def get_thumbnail(job_id: str, slide_num: int):
 @app.get("/api/themes", tags=["Themes"])
 async def list_themes():
     """
-    List available HTML themes (from html-assets).
-    Reads directly from the shared html-assets volume.
+    List available HTML themes grouped by category.
     """
-    themes_dir = SHARED_DATA_DIR.parent / "html-assets" / "themes"  # fallback
-    # Try reading from exporter service
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                "http://exporter:8004/themes",
-                timeout=aiohttp.ClientTimeout(total=5),
-            ) as resp:
-                if resp.status == 200:
-                    return await resp.json()
-    except Exception:
-        pass
+    categories_def = {
+        "business":    {"label": "Business",    "label_vi": "Doanh nghiệp",    "emoji": "🏢", "order": 1},
+        "creative":    {"label": "Creative",    "label_vi": "Sáng tạo",        "emoji": "🎨", "order": 2},
+        "education":   {"label": "Education",   "label_vi": "Giáo dục",        "emoji": "📚", "order": 3},
+        "technology":  {"label": "Technology",  "label_vi": "Công nghệ",       "emoji": "💻", "order": 4},
+    }
 
-    # Fallback: scan local themes dir
-    html_assets = Path("/app/html-assets/themes")
-    if html_assets.exists():
-        themes = sorted([f.stem for f in html_assets.glob("*.css")])
-        return {"themes": themes, "count": len(themes)}
+    theme_registry = {
+        "corporate_blue":  {"category": "business",   "label": "Corporate Blue",  "label_vi": "Xanh doanh nghiệp",  "emoji": "💼", "accent": "#1d4ed8", "bg": "#10203c"},
+        "executive_gray":  {"category": "business",   "label": "Executive Gray",  "label_vi": "Xám sang trọng",     "emoji": "🏛️", "accent": "#b8960c", "bg": "#1e1e22"},
+        "finance_green":   {"category": "business",   "label": "Finance Green",   "label_vi": "Xanh tài chính",     "emoji": "📊", "accent": "#059609", "bg": "#0a201a"},
+        "legal_navy":      {"category": "business",   "label": "Professional Desk", "label_vi": "Bàn làm việc",      "emoji": "💼", "accent": "#4338ca", "bg": "#0e142c"},
+        "consulting_teal": {"category": "business",   "label": "Geometric Bold",   "label_vi": "Hình học nổi bật",   "emoji": "🔷", "accent": "#0d9488", "bg": "#0b2e2a"},
+        
+        "bold_orange":     {"category": "creative",   "label": "Watercolor Nature", "label_vi": "Thiên nhiên màu nước", "emoji": "🎣", "accent": "#ea580c", "bg": "#2d1606"},
+        "artistic_purple": {"category": "creative",   "label": "Notebook Grid",    "label_vi": "Sổ tay kẻ ô",         "emoji": "📓", "accent": "#7c3aed", "bg": "#1f1035"},
+        "neon_pop":        {"category": "creative",   "label": "Eco Green",        "label_vi": "Xanh sinh thái",      "emoji": "🌿", "accent": "#059669", "bg": "#062016"},
+        "retro_vintage":   {"category": "creative",   "label": "Workspace Desk",   "label_vi": "Không gian làm việc",  "emoji": "🖥️", "accent": "#b45309", "bg": "#271c10"},
+        "rose_pink":       {"category": "creative",   "label": "Watercolor Earth", "label_vi": "Trái đất màu nước",   "emoji": "🌍", "accent": "#db2777", "bg": "#2d0f1e"},
+        
+        "scholar_blue":    {"category": "education",  "label": "Classroom Board",  "label_vi": "Bảng lớp học",       "emoji": "📋", "accent": "#2563eb", "bg": "#0f1e36"},
+        "campus_green":    {"category": "education",  "label": "Open Book",        "label_vi": "Sách mở",            "emoji": "📖", "accent": "#16a34a", "bg": "#0b2414"},
+        "library_brown":   {"category": "education",  "label": "Graduation Idea",  "label_vi": "Ý tưởng tốt nghiệp", "emoji": "🎓", "accent": "#92400e", "bg": "#22140d"},
+        "science_teal":    {"category": "education",  "label": "Creative Pencil",  "label_vi": "Bút chì sáng tạo",   "emoji": "✏️", "accent": "#0d9488", "bg": "#092422"},
+        "chalkboard":      {"category": "education",  "label": "Chalkboard",       "label_vi": "Bảng phấn",          "emoji": "📝", "accent": "#4b5563", "bg": "#1f2937"},
+        
+        "cyber_punk":      {"category": "technology", "label": "Network Connect",  "label_vi": "Mạng kết nối",       "emoji": "🔗", "accent": "#d946ef", "bg": "#1e0b36"},
+        "matrix_green":    {"category": "technology", "label": "Cyber Vision",     "label_vi": "Tầm nhìn số",        "emoji": "👁️", "accent": "#22c55e", "bg": "#022c22"},
+        "ai_blue":         {"category": "technology", "label": "AI Blue",          "label_vi": "Xanh AI",            "emoji": "🧠", "accent": "#3b82f6", "bg": "#031e45"},
+        "quantum_violet":  {"category": "technology", "label": "Space Rocket",     "label_vi": "Tên lửa vũ trụ",     "emoji": "🚀", "accent": "#8b5cf6", "bg": "#1e0b36"},
+        "data_orange":     {"category": "technology", "label": "Robot Hand",       "label_vi": "Tay robot",          "emoji": "🤖", "accent": "#f97316", "bg": "#2c1402"},
+    }
 
-    return {"themes": [], "count": 0}
+    categories = []
+    for cat_id, cat_info in sorted(categories_def.items(), key=lambda x: x[1]["order"]):
+        cat_themes = []
+        for theme_id, reg in theme_registry.items():
+            if reg["category"] != cat_id:
+                continue
+            cat_themes.append({
+                "id": theme_id,
+                "label": reg["label"],
+                "label_vi": reg["label_vi"],
+                "emoji": reg["emoji"],
+                "accent": reg["accent"],
+                "bg": reg["bg"]
+            })
+        categories.append({
+            "id": cat_id,
+            "label": cat_info["label"],
+            "label_vi": cat_info["label_vi"],
+            "emoji": cat_info["emoji"],
+            "themes": cat_themes
+        })
+
+    return {"categories": categories, "default": "corporate_blue"}
+
+
+@app.get("/api/slides/themes", tags=["Themes"])
+async def list_slides_themes():
+    """Alias for compatibility with frontend code."""
+    return await list_themes()
+
+
+@app.get("/api/themes/{theme_id}/preview", tags=["Themes"])
+async def get_theme_preview(theme_id: str):
+    """
+    Return theme metadata and preview slide thumbnails.
+    Generates inline SVG slide thumbnails encoded in Base64 for offline compatibility.
+    """
+    import base64
+    
+    theme_registry = {
+        "corporate_blue":  {"category": "business",   "label": "Corporate Blue",  "label_vi": "Xanh doanh nghiệp",  "emoji": "💼", "category_label": "Business", "category_label_vi": "Doanh nghiệp"},
+        "executive_gray":  {"category": "business",   "label": "Executive Gray",  "label_vi": "Xám sang trọng",     "emoji": "🏛️", "category_label": "Business", "category_label_vi": "Doanh nghiệp"},
+        "finance_green":   {"category": "business",   "label": "Finance Green",   "label_vi": "Xanh tài chính",     "emoji": "📊", "category_label": "Business", "category_label_vi": "Doanh nghiệp"},
+        "legal_navy":      {"category": "business",   "label": "Professional Desk", "label_vi": "Bàn làm việc",      "emoji": "💼", "category_label": "Business", "category_label_vi": "Doanh nghiệp"},
+        "consulting_teal": {"category": "business",   "label": "Geometric Bold",   "label_vi": "Hình học nổi bật",   "emoji": "🔷", "category_label": "Business", "category_label_vi": "Doanh nghiệp"},
+        
+        "bold_orange":     {"category": "creative",   "label": "Watercolor Nature", "label_vi": "Thiên nhiên màu nước", "emoji": "🎣", "category_label": "Creative", "category_label_vi": "Sáng tạo"},
+        "artistic_purple": {"category": "creative",   "label": "Notebook Grid",    "label_vi": "Sổ tay kẻ ô",         "emoji": "📓", "category_label": "Creative", "category_label_vi": "Sáng tạo"},
+        "neon_pop":        {"category": "creative",   "label": "Eco Green",        "label_vi": "Xanh sinh thái",      "emoji": "🌿", "category_label": "Creative", "category_label_vi": "Sáng tạo"},
+        "retro_vintage":   {"category": "creative",   "label": "Workspace Desk",   "label_vi": "Không gian làm việc",  "emoji": "🖥️", "category_label": "Creative", "category_label_vi": "Sáng tạo"},
+        "rose_pink":       {"category": "creative",   "label": "Watercolor Earth", "label_vi": "Trái đất màu nước",   "emoji": "🌍", "category_label": "Creative", "category_label_vi": "Sáng tạo"},
+        
+        "scholar_blue":    {"category": "education",  "label": "Classroom Board",  "label_vi": "Bảng lớp học",       "emoji": "📋", "category_label": "Education", "category_label_vi": "Giáo dục"},
+        "campus_green":    {"category": "education",  "label": "Open Book",        "label_vi": "Sách mở",            "emoji": "📖", "category_label": "Education", "category_label_vi": "Giáo dục"},
+        "library_brown":   {"category": "education",  "label": "Graduation Idea",  "label_vi": "Ý tưởng tốt nghiệp", "emoji": "🎓", "category_label": "Education", "category_label_vi": "Giáo dục"},
+        "science_teal":    {"category": "education",  "label": "Creative Pencil",  "label_vi": "Bút chì sáng tạo",   "emoji": "✏️", "category_label": "Education", "category_label_vi": "Giáo dục"},
+        "chalkboard":      {"category": "education",  "label": "Chalkboard",       "label_vi": "Bảng phấn",          "emoji": "📝", "category_label": "Education", "category_label_vi": "Giáo dục"},
+        
+        "cyber_punk":      {"category": "technology", "label": "Network Connect",  "label_vi": "Mạng kết nối",       "emoji": "🔗", "category_label": "Technology", "category_label_vi": "Công nghệ"},
+        "matrix_green":    {"category": "technology", "label": "Cyber Vision",     "label_vi": "Tầm nhìn số",        "emoji": "👁️", "category_label": "Technology", "category_label_vi": "Công nghệ"},
+        "ai_blue":         {"category": "technology", "label": "AI Blue",          "label_vi": "Xanh AI",            "emoji": "🧠", "category_label": "Technology", "category_label_vi": "Công nghệ"},
+        "quantum_violet":  {"category": "technology", "label": "Space Rocket",     "label_vi": "Tên lửa vũ trụ",     "emoji": "🚀", "category_label": "Technology", "category_label_vi": "Công nghệ"},
+        "data_orange":     {"category": "technology", "label": "Robot Hand",       "label_vi": "Tay robot",          "emoji": "🤖", "category_label": "Technology", "category_label_vi": "Công nghệ"},
+    }
+    
+    reg = theme_registry.get(
+        theme_id, {"label": theme_id.title(), "label_vi": theme_id.title(), "emoji": "🎨", "category_label": "Modern", "category_label_vi": "Hiện đại"}
+    )
+    
+    # Generate 3 beautiful mock SVG slides in base64 format
+    slides = []
+    for i in range(1, 4):
+        svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
+            <rect width="800" height="450" fill="#1e1e2e" rx="10"/>
+            <circle cx="400" cy="225" r="150" fill="#313244" opacity="0.5"/>
+            <rect x="50" y="50" width="700" height="350" fill="none" stroke="#45475a" stroke-width="2" rx="5"/>
+            <text x="400" y="200" fill="#cdd6f4" font-family="system-ui, sans-serif" font-size="32" font-weight="bold" text-anchor="middle">
+                {theme_id.upper()}
+            </text>
+            <text x="400" y="260" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="20" text-anchor="middle">
+                Slide {i} Preview
+            </text>
+            <rect x="350" y="300" width="100" height="4" fill="#f38ba8" rx="2"/>
+        </svg>"""
+        b64_svg = base64.b64encode(svg.encode('utf-8')).decode('utf-8')
+        image_url = f"data:image/svg+xml;base64,{b64_svg}"
+        slides.append({
+            "slide_number": i,
+            "image_url": image_url
+        })
+        
+    return {
+        "theme_id": theme_id,
+        "label": reg["label"],
+        "label_vi": reg["label_vi"],
+        "emoji": reg["emoji"],
+        "category": reg["category_label"],
+        "category_vi": reg["category_label_vi"],
+        "slides": slides,
+    }
+
+
+@app.get("/api/slides/themes/{theme_id}/preview", tags=["Themes"])
+async def get_slides_theme_preview(theme_id: str):
+    """Alias for compatibility with frontend code."""
+    return await get_theme_preview(theme_id)
 
 
 @app.get("/api/layouts", tags=["Layouts"])
