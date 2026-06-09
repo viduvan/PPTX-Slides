@@ -245,10 +245,7 @@ async def preview_slides(session_id: str):
     return PreviewResponse(
         session_id=session_id,
         slides=[SlideData(**s) for s in preview_data],
-        total_slides=len(preview_data),
-        created_at=session.created_at,
     )
-
 
 @router.get("/{session_id}/download")
 async def download_slides(session_id: str):
@@ -274,10 +271,47 @@ async def download_slides(session_id: str):
             filename="presentation.pptx",
             media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
         )
-
     except Exception as e:
         logger.error(f"Error creating PPTX: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create PPTX file: {e}")
+
+# ---------------------------------------------------------------------------
+# PDF Export Endpoint
+# ---------------------------------------------------------------------------
+@router.get("/{session_id}/export/pdf")
+async def export_pdf(session_id: str):
+    """Generate a PDF version of the current session's presentation.
+
+    The endpoint re‑uses the existing PPTX generation logic and then converts
+    the resulting file to PDF using :func:`pdf_service.convert_pptx_to_pdf`.
+    """
+    session = session_manager.get_session(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    try:
+        # Re‑use PPTX creation
+        template_path = session.template_name
+        pptx_path = await slide_service.create_pptx(
+            slides=session.slides,
+            template_path=template_path,
+            output_path=None,
+            theme_name=session.theme,
+            document_topic=session.document_topic,
+        )
+
+        # Convert to PDF
+        from ..services.pdf_service import convert_pptx_to_pdf
+        pdf_path = convert_pptx_to_pdf(pptx_path)
+
+        return FileResponse(
+            path=str(pdf_path),
+            filename="presentation.pdf",
+            media_type="application/pdf",
+        )
+    except Exception as e:
+        logger.error(f"Error exporting PDF: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to export PDF: {e}")
 
 
 @router.put("/{session_id}/slides")
