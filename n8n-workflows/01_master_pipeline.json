@@ -1,45 +1,55 @@
 {
+  "id": "tudNWVa7K0uk03bs",
   "name": "PPTX-Slides: Master Pipeline",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
         "path": "pptx-generate",
-        "responseMode": "responseNode",
+        "responseMode": "onReceived",
         "options": {}
       },
       "id": "webhook-trigger",
       "name": "Webhook Trigger",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [200, 300],
+      "position": [
+        200,
+        300
+      ],
       "webhookId": "pptx-generate"
     },
     {
       "parameters": {
-        "jsCode": "// Validate input from API Gateway\nconst body = $input.first().json.body;\n\nif (!body.prompt || body.prompt.trim() === '') {\n  throw new Error('Prompt is required');\n}\n\nconst jobId = body.job_id || crypto.randomUUID();\nconst hasDocument = !!(body.document_text && body.document_text.trim().length > 0);\nconst wordCount = hasDocument ? body.document_text.split(/\\s+/).length : 0;\n\nreturn [{\n  json: {\n    job_id: jobId,\n    session_id: body.session_id,\n    prompt: body.prompt.trim(),\n    document_text: body.document_text || '',\n    has_document: hasDocument,\n    word_count: wordCount,\n    theme: body.theme || 'auto',\n    output_format: body.output_format || 'pptx'\n  }\n}];"
+        "jsCode": "// Validate input from API Gateway\nconst body = $input.first().json.body;\n\nif (!body.prompt || body.prompt.trim() === '') {\n  throw new Error('Prompt is required');\n}\n\nconst jobId = body.job_id || crypto.randomUUID();\nconst hasDocument = !!(body.document_text && body.document_text.trim().length > 0);\nconst wordCount = hasDocument ? body.document_text.split(/\\s+/).length : 0;\n\ntry {\n  $execution.metadata.set('job_id', jobId);\n} catch (e) {\n  // Ignored in test environment\n}\n\nreturn [{\n  json: {\n    job_id: jobId,\n    session_id: body.session_id,\n    prompt: body.prompt.trim(),\n    document_text: body.document_text || '',\n    has_document: hasDocument,\n    word_count: wordCount,\n    theme: body.theme || 'auto',\n    output_format: body.output_format || 'pptx'\n  }\n}];"
       },
       "id": "validate-input",
       "name": "Validate Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [420, 300]
+      "position": [
+        420,
+        300
+      ]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "INSERT INTO pptx_app.jobs (id, session_id, status, current_agent, progress_pct, progress_message, output_format) VALUES ('{{ $json.job_id }}', '{{ $json.session_id }}', 'analyst', 'analyst', 5, 'Đang phân tích tài liệu...', '{{ $json.output_format }}') ON CONFLICT (id) DO UPDATE SET status='analyst', current_agent='analyst', progress_pct=5, progress_message='Đang phân tích tài liệu...'",
+        "query": "INSERT INTO pptx_app.jobs (job_id, status, current_agent, progress_pct, progress_message, output_format, prompt) VALUES ('{{ $json.job_id }}', 'analyst', 'analyst', 5, 'Đang phân tích tài liệu...', '{{ $json.output_format }}', '{{ $json.prompt }}') ON CONFLICT (job_id) DO UPDATE SET status='analyst', current_agent='analyst', progress_pct=5, progress_message='Đang phân tích tài liệu...'",
         "options": {}
       },
       "id": "db-create-job",
       "name": "DB: Create Job",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [640, 300],
+      "position": [
+        640,
+        300
+      ],
       "credentials": {
         "postgres": {
-          "id": "CONFIGURE_ME",
-          "name": "PPTX Postgres"
+          "id": "u3A6fS4ZfMmbqb6r",
+          "name": "PPTX Slides Postgres"
         }
       }
     },
@@ -70,19 +80,21 @@
       "name": "Has Document?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [860, 300]
+      "position": [
+        860,
+        300
+      ]
     },
     {
       "parameters": {
         "workflowId": {
           "__rl": true,
           "mode": "list",
-          "value": "CONFIGURE_ME_ANALYSIS"
+          "value": "P7OnkXnYqu22vHlL",
+          "cachedResultUrl": "/workflow/Fzif0OfYVMX2NzZh",
+          "cachedResultName": "PPTX-Slides: Analysis Pipeline"
         },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {}
-        },
+
         "options": {
           "waitForSubWorkflow": true
         }
@@ -91,7 +103,10 @@
       "name": "Analysis (with doc)",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
-      "position": [1080, 200],
+      "position": [
+        1080,
+        200
+      ],
       "notesInFlow": true,
       "notes": "Sub-workflow: 02_analysis_pipeline\nInput: job_id, prompt, document_text, word_count"
     },
@@ -100,12 +115,11 @@
         "workflowId": {
           "__rl": true,
           "mode": "list",
-          "value": "CONFIGURE_ME_ANALYSIS"
+          "value": "P7OnkXnYqu22vHlL",
+          "cachedResultUrl": "/workflow/Fzif0OfYVMX2NzZh",
+          "cachedResultName": "PPTX-Slides: Analysis Pipeline"
         },
-        "workflowInputs": {
-          "mappingMode": "defineBelow",
-          "value": {}
-        },
+
         "options": {
           "waitForSubWorkflow": true
         }
@@ -114,7 +128,10 @@
       "name": "Analysis (prompt only)",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
-      "position": [1080, 420],
+      "position": [
+        1080,
+        420
+      ],
       "notesInFlow": true,
       "notes": "Sub-workflow: 02_analysis_pipeline\nInput: job_id, prompt (no document)"
     },
@@ -126,23 +143,29 @@
       "name": "Merge Analysis Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1300, 300]
+      "position": [
+        1300,
+        300
+      ]
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE pptx_app.jobs SET status='writer', current_agent='writer', progress_pct=30, progress_message='Đang viết nội dung slides...', analyst_result='{{ JSON.stringify($json.analyst_result) }}'::jsonb WHERE id='{{ $json.job_id }}'",
+        "query": "UPDATE pptx_app.jobs SET status='writer', current_agent='writer', progress_pct=30, progress_message='Đang viết nội dung slides...', analyst_result='{{ JSON.stringify($json.analyst_result) }}'::jsonb WHERE job_id='{{ $json.job_id }}'",
         "options": {}
       },
       "id": "db-update-writer",
       "name": "DB: Status → Writer",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1520, 300],
+      "position": [
+        1520,
+        300
+      ],
       "credentials": {
         "postgres": {
-          "id": "CONFIGURE_ME",
-          "name": "PPTX Postgres"
+          "id": "u3A6fS4ZfMmbqb6r",
+          "name": "PPTX Slides Postgres"
         }
       }
     },
@@ -151,7 +174,9 @@
         "workflowId": {
           "__rl": true,
           "mode": "list",
-          "value": "CONFIGURE_ME_WRITING"
+          "value": "cdjb8COYSJaYr6Io",
+          "cachedResultUrl": "/workflow/jppCPPcLIQ47ybLI",
+          "cachedResultName": "PPTX-Slides: Writing Pipeline"
         },
         "options": {
           "waitForSubWorkflow": true
@@ -161,25 +186,31 @@
       "name": "Writing Pipeline",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
-      "position": [1740, 300],
+      "position": [
+        1740,
+        300
+      ],
       "notesInFlow": true,
       "notes": "Sub-workflow: 03_writing_pipeline\nInput: outline, chunk_mapping, chunks"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE pptx_app.jobs SET status='designer', current_agent='designer', progress_pct=60, progress_message='Đang thiết kế visual...', writer_result='{{ JSON.stringify($json.slides) }}'::jsonb WHERE id='{{ $json.job_id }}'",
+        "query": "UPDATE pptx_app.jobs SET status='designer', current_agent='designer', progress_pct=60, progress_message='Đang thiết kế visual...', writer_result='{{ JSON.stringify($json.slides) }}'::jsonb WHERE job_id='{{ $json.job_id }}'",
         "options": {}
       },
       "id": "db-update-designer",
       "name": "DB: Status → Designer",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [1960, 300],
+      "position": [
+        1960,
+        300
+      ],
       "credentials": {
         "postgres": {
-          "id": "CONFIGURE_ME",
-          "name": "PPTX Postgres"
+          "id": "u3A6fS4ZfMmbqb6r",
+          "name": "PPTX Slides Postgres"
         }
       }
     },
@@ -188,7 +219,9 @@
         "workflowId": {
           "__rl": true,
           "mode": "list",
-          "value": "CONFIGURE_ME_DESIGN"
+          "value": "8LVqIvaDIEpH51yk",
+          "cachedResultUrl": "/workflow/GR8LBXdzOZ3fnFHn",
+          "cachedResultName": "PPTX-Slides: Design Pipeline"
         },
         "options": {
           "waitForSubWorkflow": true
@@ -198,25 +231,31 @@
       "name": "Design Pipeline",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
-      "position": [2180, 300],
+      "position": [
+        2180,
+        300
+      ],
       "notesInFlow": true,
       "notes": "Sub-workflow: 04_design_pipeline\nInput: slides, context"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE pptx_app.jobs SET status='exporter', current_agent='exporter', progress_pct=80, progress_message='Đang xuất file...', designer_result='{{ JSON.stringify($json.visual_specs) }}'::jsonb WHERE id='{{ $json.job_id }}'",
+        "query": "UPDATE pptx_app.jobs SET status='exporter', current_agent='exporter', progress_pct=80, progress_message='Đang xuất file...', designer_result='{{ JSON.stringify($json.visual_specs) }}'::jsonb WHERE job_id='{{ $json.job_id }}'",
         "options": {}
       },
       "id": "db-update-exporter",
       "name": "DB: Status → Exporter",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [2400, 300],
+      "position": [
+        2400,
+        300
+      ],
       "credentials": {
         "postgres": {
-          "id": "CONFIGURE_ME",
-          "name": "PPTX Postgres"
+          "id": "u3A6fS4ZfMmbqb6r",
+          "name": "PPTX Slides Postgres"
         }
       }
     },
@@ -225,7 +264,9 @@
         "workflowId": {
           "__rl": true,
           "mode": "list",
-          "value": "CONFIGURE_ME_EXPORT"
+          "value": "eOIrS1fj02rkj62q",
+          "cachedResultUrl": "/workflow/fPsEnGMkh7GRoe5y",
+          "cachedResultName": "PPTX-Slides: Export Pipeline"
         },
         "options": {
           "waitForSubWorkflow": true
@@ -235,111 +276,352 @@
       "name": "Export Pipeline",
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.2,
-      "position": [2620, 300],
+      "position": [
+        2620,
+        300
+      ],
       "notesInFlow": true,
       "notes": "Sub-workflow: 05_export_pipeline\nInput: slides, visual_specs"
     },
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE pptx_app.jobs SET status='done', progress_pct=100, progress_message='Hoàn tất!', exporter_result='{{ JSON.stringify($json.file_paths) }}'::jsonb, completed_at=NOW() WHERE id='{{ $json.job_id }}'",
+        "query": "UPDATE pptx_app.jobs SET status='done', progress_pct=100, progress_message='Hoàn tất!', exporter_result='{{ JSON.stringify($json.file_paths) }}'::jsonb, completed_at=NOW() WHERE job_id='{{ $json.job_id }}'",
         "options": {}
       },
       "id": "db-complete",
       "name": "DB: Status → Done",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [2840, 300],
+      "position": [
+        2840,
+        300
+      ],
       "credentials": {
         "postgres": {
-          "id": "CONFIGURE_ME",
-          "name": "PPTX Postgres"
+          "id": "u3A6fS4ZfMmbqb6r",
+          "name": "PPTX Slides Postgres"
         }
       }
     },
     {
       "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ success: true, job_id: $json.job_id, status: 'done', file_paths: $json.file_paths }) }}",
+        "jsCode": "// Forward pipeline data (DB node only returns UPDATE result)\nconst data = $('Merge Analysis Result').first().json;\nreturn [{ json: data }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        380
+      ],
+      "id": "df0ee79e-8ce3-4f57-b018-e7826dbc5ab6",
+      "name": "Forward to Writer"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Forward pipeline data\nconst data = $('Writing Pipeline').first().json;\nreturn [{ json: data }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1960,
+        380
+      ],
+      "id": "0ad224fa-e872-4106-b8ef-28dfc0a807c8",
+      "name": "Forward to Designer"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Forward pipeline data\nconst data = $('Design Pipeline').first().json;\nreturn [{ json: data }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        380
+      ],
+      "id": "d06e197c-ce2d-49b2-87b5-c1da673f7d6d",
+      "name": "Forward to Exporter"
+    },
+    {
+      "parameters": {},
+      "id": "error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst executionId = parseInt(input.execution?.id || '0');\nconst errorMsg = input.error?.message || 'Unknown error';\n\nreturn [{\n  json: {\n    execution_id: executionId,\n    error_message: errorMsg\n  }\n}];"
+      },
+      "id": "handle-error-node",
+      "name": "Handle Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE pptx_app.jobs SET status='error', error_message='{{ $json.error_message }}', completed_at=NOW() WHERE job_id = COALESCE((SELECT value FROM n8n.execution_metadata WHERE \"executionId\" = {{ $json.execution_id }} AND key = 'job_id' LIMIT 1), (SELECT job_id FROM pptx_app.jobs WHERE status NOT IN ('done', 'error') ORDER BY created_at DESC LIMIT 1))",
         "options": {}
       },
-      "id": "respond-webhook",
-      "name": "Respond Success",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [3060, 300]
+      "id": "db-set-error",
+      "name": "DB: Set Error Status",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        640,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "u3A6fS4ZfMmbqb6r",
+          "name": "PPTX Slides Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Forward pipeline data\nconst data = $('Validate Input').first().json;\nreturn [{ json: data }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        380
+      ],
+      "id": "forward-to-has-document",
+      "name": "Forward to Has Document?"
     }
   ],
   "connections": {
     "Webhook Trigger": {
       "main": [
-        [{ "node": "Validate Input", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Validate Input": {
       "main": [
-        [{ "node": "DB: Create Job", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "DB: Create Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "DB: Create Job": {
       "main": [
-        [{ "node": "Has Document?", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Forward to Has Document?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Forward to Has Document?": {
+      "main": [
+        [
+          {
+            "node": "Has Document?",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Has Document?": {
       "main": [
-        [{ "node": "Analysis (with doc)", "type": "main", "index": 0 }],
-        [{ "node": "Analysis (prompt only)", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Analysis (with doc)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Analysis (prompt only)",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Analysis (with doc)": {
       "main": [
-        [{ "node": "Merge Analysis Result", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Merge Analysis Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Analysis (prompt only)": {
       "main": [
-        [{ "node": "Merge Analysis Result", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Merge Analysis Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Merge Analysis Result": {
       "main": [
-        [{ "node": "DB: Status → Writer", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "DB: Status → Writer",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "DB: Status → Writer": {
       "main": [
-        [{ "node": "Writing Pipeline", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Forward to Writer",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Writing Pipeline": {
       "main": [
-        [{ "node": "DB: Status → Designer", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "DB: Status → Designer",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "DB: Status → Designer": {
       "main": [
-        [{ "node": "Design Pipeline", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Forward to Designer",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Design Pipeline": {
       "main": [
-        [{ "node": "DB: Status → Exporter", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "DB: Status → Exporter",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "DB: Status → Exporter": {
       "main": [
-        [{ "node": "Export Pipeline", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Forward to Exporter",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Export Pipeline": {
       "main": [
-        [{ "node": "DB: Status → Done", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "DB: Status → Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "DB: Status → Done": {
       "main": [
-        [{ "node": "Respond Success", "type": "main", "index": 0 }]
+        []
+      ]
+    },
+    "Forward to Writer": {
+      "main": [
+        [
+          {
+            "node": "Writing Pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Forward to Designer": {
+      "main": [
+        [
+          {
+            "node": "Design Pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Forward to Exporter": {
+      "main": [
+        [
+          {
+            "node": "Export Pipeline",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Handle Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Error": {
+      "main": [
+        [
+          {
+            "node": "DB: Set Error Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
@@ -347,5 +629,11 @@
     "executionOrder": "v1"
   },
   "staticData": null,
-  "tags": [{ "name": "pptx-slides" }]
+  "tags": [
+    {
+      "name": "pptx-slides"
+    }
+  ],
+  "active": true,
+  "pinData": {}
 }
