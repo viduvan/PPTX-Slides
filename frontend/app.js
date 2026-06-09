@@ -67,6 +67,7 @@ const dom = {
     editBtn: $('#editBtn'),
     undoBtn: $('#undoBtn'),
     downloadBtn: $('#downloadBtn'),
+    exportPdfBtn: $('#exportPdfBtn'),
 
     // Modal
     slideModal: $('#slideModal'),
@@ -379,6 +380,10 @@ function setupEdit() {
     dom.editBtn.addEventListener('click', editSlides);
     dom.undoBtn.addEventListener('click', undoSlides);
     dom.downloadBtn.addEventListener('click', downloadSlides);
+    // Register Export PDF button if present
+    if (dom.exportPdfBtn) {
+        dom.exportPdfBtn.addEventListener('click', exportPdf);
+    }
 
     // Ctrl+Enter to edit
     dom.editInput.addEventListener('keydown', (e) => {
@@ -504,6 +509,49 @@ async function downloadSlides() {
         setTimeout(() => setStatus(t('status.ready'), 'ready'), 3000);
     } finally {
         // Always restore button state
+        btn.classList.remove('is-downloading');
+        btn.disabled = false;
+        btn.removeAttribute('data-loading-text');
+    }
+}
+
+/**
+ * Export the current session as PDF and trigger download.
+ */
+async function exportPdf() {
+    if (!state.sessionId) return;
+
+    const btn = dom.exportPdfBtn;
+    // Show loading state on button
+    btn.classList.add('is-downloading');
+    btn.disabled = true;
+    btn.setAttribute('data-loading-text', 'Đang tải PDF...');
+
+    setStatus(t('status.downloading'), 'loading');
+
+    try {
+        const res = await fetch(`${API_BASE}/api/slides/${state.sessionId}/export/pdf`);
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ detail: 'Export failed' }));
+            throw new Error(err.detail || 'Export failed');
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `presentation_${state.sessionId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        setStatus(t('status.ready'), 'ready');
+        showToast(t('toast.download.success') || 'PDF exported successfully', 'success');
+    } catch (err) {
+        setStatus(t('status.error'), 'error');
+        showToast(`${t('toast.download.error') || 'Download error'} ${err.message}`, 'error');
+        setTimeout(() => setStatus(t('status.ready'), 'ready'), 3000);
+    } finally {
         btn.classList.remove('is-downloading');
         btn.disabled = false;
         btn.removeAttribute('data-loading-text');
