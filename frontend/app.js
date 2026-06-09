@@ -306,14 +306,19 @@ async function generateSlides() {
                     const displayPct = Math.round(Math.max(simPct, serverPct));
                     updateGenProgress(displayPct);
 
+                    const isVi = (typeof currentLang !== 'undefined' && currentLang === 'vi');
                     const statusMap = {
-                        'queued': 'Waiting in queue...',
-                        'analyzing': 'Analyzing document...',
-                        'writing': 'Writing slide content...',
-                        'designing': 'Designing visuals...',
-                        'exporting': 'Building presentation files...',
-                        'done': 'Complete!',
-                        'error': 'Error occurred',
+                        'queued': isVi ? 'Đang chờ trong hàng đợi...' : 'Waiting in queue...',
+                        'analyzing': isVi ? 'Đang phân tích tài liệu...' : 'Analyzing document...',
+                        'analyst': isVi ? 'Đang phân tích tài liệu...' : 'Analyzing document...',
+                        'writing': isVi ? 'Đang soạn thảo nội dung slide...' : 'Writing slide content...',
+                        'writer': isVi ? 'Đang soạn thảo nội dung slide...' : 'Writing slide content...',
+                        'designing': isVi ? 'Đang thiết kế hình ảnh/bố cục...' : 'Designing visuals...',
+                        'designer': isVi ? 'Đang thiết kế hình ảnh/bố cục...' : 'Designing visuals...',
+                        'exporting': isVi ? 'Đang xuất tệp trình chiếu...' : 'Building presentation files...',
+                        'exporter': isVi ? 'Đang xuất tệp trình chiếu...' : 'Building presentation files...',
+                        'done': isVi ? 'Hoàn thành!' : 'Complete!',
+                        'error': isVi ? 'Có lỗi xảy ra' : 'Error occurred',
                     };
                     dom.loadingText.textContent = statusMap[job.status] || job.status;
 
@@ -323,8 +328,12 @@ async function generateSlides() {
                         state.pptxPath = job.pptx_path;
                         state.htmlPath = job.html_path;
                         state.slides = [];
+                        
+                        // Fallback to thumbnail paths length if slide_count is missing or 0
+                        const actualSlideCount = job.slide_count || (job.thumbnail_paths ? job.thumbnail_paths.length : 0) || 1;
+                        
                         // Create slide data from slide_count
-                        for (let i = 1; i <= (job.slide_count || 1); i++) {
+                        for (let i = 1; i <= actualSlideCount; i++) {
                             state.slides.push({
                                 slide_number: i,
                                 title: `Slide ${i}`,
@@ -888,7 +897,7 @@ function escapeHtml(text) {
 // ── Theme Selector ─────────────────────────────────────────
 async function loadThemes() {
     try {
-        const res = await fetch(`${API_BASE}/api/slides/themes`);
+        const res = await fetch(`${API_BASE}/api/themes`);
         if (!res.ok) return;
 
         const data = await res.json();
@@ -1012,7 +1021,7 @@ function setupThemePreview() {
 async function showThemePreview(themeId) {
     try {
         setStatus(t('preview.heading'), 'loading');
-        const res = await fetch(`${API_BASE}/api/slides/themes/${themeId}/preview`);
+        const res = await fetch(`${API_BASE}/api/themes/${themeId}/preview`);
         if (!res.ok) throw new Error('Preview fetch failed');
 
         const data = await res.json();
