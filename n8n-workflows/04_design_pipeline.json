@@ -69,7 +69,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse layout selection\nconst response = $input.first().json;\nconst text = response.output || '[]';\nlet layouts = [];\ntry { \n  layouts = JSON.parse(text.replace(/```json\\n?|```/g, \"\")); \n} catch(e) { \n  const match = text.match(/\\[[\\s\\S]*\\]/);\n  if (match) {\n    try { layouts = JSON.parse(match[0]); } catch(e2) {}\n  }\n}\nreturn [{ json: { ...($('Build Layout Prompt').first().json), layouts } }];"
+        "jsCode": "// Parse layout selection\nconst response = $input.first().json;\nlet text = response.output || '[]';\ntext = text.replace(/<think>[\\s\\S]*?<\\/think>/g, \"\").trim();\nlet layouts = [];\ntry { \n  layouts = JSON.parse(text.replace(/```json\\n?|```/g, \"\")); \n} catch(e) { \n  const match = text.match(/\\[[\\s\\S]*\\]/);\n  if (match) {\n    try { layouts = JSON.parse(match[0]); } catch(e2) {}\n  }\n}\nreturn [{ json: { ...($('Build Layout Prompt').first().json), layouts } }];"
       },
       "id": "parse-layouts",
       "name": "Parse Layouts",
@@ -188,7 +188,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Combine layouts + theme + images → visual_specs\nconst images = $input.first().json;\nlet theme = 'midnight';\ntry {\n  theme = $('Use User Theme').first().json.selected_theme;\n} catch (e) {\n  try {\n    const llmOut = $('LLM: Select Theme').first().json.output;\n    const parsed = JSON.parse(llmOut.replace(/```json\\n?|```/g, \"\"));\n    theme = parsed.theme || 'midnight';\n  } catch (e2) {\n    theme = 'midnight';\n  }\n}\n\nreturn [{\n  json: {\n    job_id: $('Start').first().json.job_id,\n    slides: $('Start').first().json.slides,\n    output_format: $('Start').first().json.output_format,\n    visual_specs: {\n      theme: theme,\n      layouts: $('Parse Layouts').first().json.layouts,\n      images: images.image_paths || {}\n    }\n  }\n}];"
+        "jsCode": "// Combine layouts + theme + images → visual_specs\nconst images = $input.first().json;\nlet theme = 'midnight';\ntry {\n  theme = $('Use User Theme').first().json.selected_theme;\n} catch (e) {\n  try {\n    let llmOut = $('LLM: Select Theme').first().json.output || '{}';\n    llmOut = llmOut.replace(/<think>[\\s\\S]*?<\\/think>/g, \"\").trim();\n    const parsed = JSON.parse(llmOut.replace(/```json\\n?|```/g, \"\"));\n    theme = parsed.theme || 'midnight';\n  } catch (e2) {\n    theme = 'midnight';\n  }\n}\n\nreturn [{\n  json: {\n    job_id: $('Start').first().json.job_id,\n    slides: $('Start').first().json.slides,\n    output_format: $('Start').first().json.output_format,\n    visual_specs: {\n      theme: theme,\n      layouts: $('Parse Layouts').first().json.layouts,\n      images: images.image_paths || {}\n    }\n  }\n}];"
       },
       "id": "merge-specs",
       "name": "Merge Visual Specs",
