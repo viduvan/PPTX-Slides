@@ -42,9 +42,8 @@
         "conditions": {
           "conditions": [
             {
-              "id": "html-check",
-              "leftValue": "={{ $('Start').first().json.output_format }}",
-              "rightValue": "both",
+              "leftValue": "1",
+              "rightValue": "1",
               "operator": {
                 "type": "string",
                 "operation": "equals",
