@@ -85,7 +85,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse LLM response → slides array\nconst response = $input.first().json;\nconst text = response.output || '[]';\n\ntry {\n  const slides = JSON.parse(text.replace(/```json\\n?|```/g, \"\"));\n  return [{ json: { section_slides: Array.isArray(slides) ? slides : [slides] } }];\n} catch (e) {\n  // Try to extract JSON from text\n  const match = text.match(/\\[[\\s\\S]*\\]/);\n  if (match) {\n    try {\n      return [{ json: { section_slides: JSON.parse(match[0]) } }];\n    } catch (e2) {}\n  }\n  return [{ json: { section_slides: [], parse_error: e.message } }];\n}"
+        "jsCode": "// Parse LLM response → slides array\nconst response = $input.first().json;\nlet text = response.output || '[]';\ntext = text.replace(/<think>[\\s\\S]*?<\\/think>/g, \"\").trim();\n\ntry {\n  const slides = JSON.parse(text.replace(/```json\\n?|```/g, \"\"));\n  return [{ json: { section_slides: Array.isArray(slides) ? slides : [slides] } }];\n} catch (e) {\n  // Try to extract JSON from text\n  const match = text.match(/\\[[\\s\\S]*\\]/);\n  if (match) {\n    try {\n      return [{ json: { section_slides: JSON.parse(match[0]) } }];\n    } catch (e2) {}\n  }\n  return [{ json: { section_slides: [], parse_error: e.message } }];\n}"
       },
       "id": "parse-slides",
       "name": "Parse Slides JSON",
