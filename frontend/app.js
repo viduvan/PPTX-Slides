@@ -68,6 +68,12 @@ const dom = {
     undoBtn: $('#undoBtn'),
     downloadBtn: $('#downloadBtn'),
     exportPdfBtn: $('#exportPdfBtn'),
+    previewHtmlBtn: $('#previewHtmlBtn'),
+    downloadHtmlBtn: $('#downloadHtmlBtn'),
+    htmlPreviewModal: $('#htmlPreviewModal'),
+    htmlPreviewFrame: $('#htmlPreviewFrame'),
+    htmlPreviewClose: $('#htmlPreviewClose'),
+    htmlPreviewNewTabBtn: $('#htmlPreviewNewTabBtn'),
 
     // Modal
     slideModal: $('#slideModal'),
@@ -393,6 +399,21 @@ function setupEdit() {
     if (dom.exportPdfBtn) {
         dom.exportPdfBtn.addEventListener('click', exportPdf);
     }
+    if (dom.previewHtmlBtn) {
+        dom.previewHtmlBtn.addEventListener('click', previewHtml);
+    }
+    if (dom.downloadHtmlBtn) {
+        dom.downloadHtmlBtn.addEventListener('click', downloadHtml);
+    }
+    if (dom.htmlPreviewClose) {
+        dom.htmlPreviewClose.addEventListener('click', () => {
+            dom.htmlPreviewModal.hidden = true;
+            dom.htmlPreviewFrame.src = 'about:blank';
+        });
+    }
+    if (dom.htmlPreviewNewTabBtn) {
+        dom.htmlPreviewNewTabBtn.addEventListener('click', openHtmlInNewTab);
+    }
 
     // Ctrl+Enter to edit
     dom.editInput.addEventListener('keydown', (e) => {
@@ -528,7 +549,8 @@ async function downloadSlides() {
  * Export the current session as PDF and trigger download.
  */
 async function exportPdf() {
-    if (!state.sessionId) return;
+    const jobId = state.jobId || state.sessionId;
+    if (!jobId) return;
 
     const btn = dom.exportPdfBtn;
     // Show loading state on button
@@ -539,7 +561,7 @@ async function exportPdf() {
     setStatus(t('status.downloading'), 'loading');
 
     try {
-        const res = await fetch(`${API_BASE}/api/slides/${state.sessionId}/export/pdf`);
+        const res = await fetch(`${API_BASE}/api/download/${jobId}/pdf`);
         if (!res.ok) {
             const err = await res.json().catch(() => ({ detail: 'Export failed' }));
             throw new Error(err.detail || 'Export failed');
@@ -588,6 +610,24 @@ async function downloadHtml() {
     } catch (err) {
         showToast(`HTML download failed: ${err.message}`, 'error');
     }
+}
+
+function previewHtml() {
+    const jobId = state.jobId || state.sessionId;
+    if (!jobId) {
+        showToast('No active session. Generate slides first.', 'error');
+        return;
+    }
+    const previewUrl = `${API_BASE}/api/preview/${jobId}/html`;
+    dom.htmlPreviewFrame.src = previewUrl;
+    dom.htmlPreviewModal.hidden = false;
+}
+
+function openHtmlInNewTab() {
+    const jobId = state.jobId || state.sessionId;
+    if (!jobId) return;
+    const previewUrl = `${API_BASE}/api/preview/${jobId}/html`;
+    window.open(previewUrl, '_blank');
 }
 
 // ── Render Slides ──────────────────────────────────────────
