@@ -31,6 +31,9 @@ const translations = {
         'btn.generate': 'Generate Slides',
         'btn.undo': 'Undo',
         'btn.download': 'Download PPTX',
+        'btn.exportPdf': 'Export PDF',
+        'btn.previewHtml': 'Preview HTML',
+        'btn.downloadHtml': 'Download HTML',
         'btn.edit': 'Edit Slides',
 
         // ── Empty state ──
@@ -130,6 +133,9 @@ const translations = {
         'btn.generate': 'Tạo Slides',
         'btn.undo': 'Hoàn tác',
         'btn.download': 'Tải PPTX',
+        'btn.exportPdf': 'Xuất PDF',
+        'btn.previewHtml': 'Xem trước HTML',
+        'btn.downloadHtml': 'Tải HTML',
         'btn.edit': 'Chỉnh sửa Slides',
 
         // ── Empty state ──
