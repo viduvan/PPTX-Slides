@@ -136,7 +136,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse Gemini response → metadata\nconst response = $input.first().json;\nconst text = response.output || '{}';\n\ntry {\n  const metadata = JSON.parse(text);\n  return [{ json: { chunk_index: $('Split Into Items').item.json.chunk_index, metadata } }];\n} catch (e) {\n  // Fallback for markdown wrapped json\n  const match = text.match(/{[\\s\\S]*}/);\n  if (match) {\n    try {\n      return [{ json: { chunk_index: $('Split Into Items').item.json.chunk_index, metadata: JSON.parse(match[0]) } }];\n    } catch(e2) {}\n  }\n  return [{ json: { chunk_index: 0, metadata: { headings: [], topics: [], key_entities: [], error: e.message } } }];\n}"
+        "jsCode": "// Parse Gemini response → metadata\nconst response = $input.first().json;\nlet text = response.output || '{}';\ntext = text.replace(/<think>[\\s\\S]*?<\\/think>/g, \"\").trim();\n\ntry {\n  const metadata = JSON.parse(text.replace(/```json\\n?|```/g, \"\"));\n  return [{ json: { chunk_index: $('Split Into Items').item.json.chunk_index, metadata } }];\n} catch (e) {\n  // Fallback for markdown wrapped json\n  const match = text.match(/{[\\s\\S]*}/);\n  if (match) {\n    try {\n      return [{ json: { chunk_index: $('Split Into Items').item.json.chunk_index, metadata: JSON.parse(match[0]) } }];\n    } catch(e2) {}\n  }\n  return [{ json: { chunk_index: 0, metadata: { headings: [], topics: [], key_entities: [], error: e.message } } }];\n}"
       },
       "id": "parse-extract",
       "name": "Parse Extract Result",
@@ -263,7 +263,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse Gemini outline response (from either branch)\nconst response = $input.first().json;\nconst text = response.output || '{}';\n\ntry {\n  const result = JSON.parse(text.replace(/```json\\n?|```/g, \"\"));\n  return [{ json: { analyst_result: result } }];\n} catch (e) {\n  const match = text.match(/{[\\s\\S]*}/);\n  if (match) {\n    try {\n      return [{ json: { analyst_result: JSON.parse(match[0]) } }];\n    } catch(e2) {}\n  }\n  throw new Error('Failed to parse outline JSON: ' + e.message);\n}"
+        "jsCode": "// Parse Gemini outline response (from either branch)\nconst response = $input.first().json;\nlet text = response.output || '{}';\ntext = text.replace(/<think>[\\s\\S]*?<\\/think>/g, \"\").trim();\n\ntry {\n  const result = JSON.parse(text.replace(/```json\\n?|```/g, \"\"));\n  return [{ json: { analyst_result: result } }];\n} catch (e) {\n  const match = text.match(/{[\\s\\S]*}/);\n  if (match) {\n    try {\n      return [{ json: { analyst_result: JSON.parse(match[0]) } }];\n    } catch(e2) {}\n  }\n  throw new Error('Failed to parse outline JSON: ' + e.message);\n}"
       },
       "id": "parse-outline",
       "name": "Parse Outline",
