@@ -324,36 +324,126 @@ async def get_job_status(job_id: str):
 @app.get("/api/download/{job_id}/{format}", tags=["Download"])
 async def download_file(job_id: str, format: str):
     """
-    Download generated file (pptx or html).
+    Download generated file (pptx, html, or pdf).
     """
-    if format not in ("pptx", "html"):
-        raise HTTPException(status_code=400, detail="Format must be 'pptx' or 'html'")
+    if format not in ("pptx", "html", "pdf"):
+        raise HTTPException(status_code=400, detail="Format must be 'pptx', 'html', or 'pdf'")
 
     # Find file path from DB
     try:
         pool = await get_pool()
         async with pool.acquire() as conn:
-            col = "pptx_path" if format == "pptx" else "html_path"
+            if format == "pptx":
+                path = await conn.fetchval(
+                    "SELECT pptx_path FROM pptx_app.jobs WHERE job_id = $1",
+                    job_id,
+                )
+            elif format == "html":
+                path = await conn.fetchval(
+                    "SELECT html_path FROM pptx_app.jobs WHERE job_id = $1",
+                    job_id,
+                )
+            else:  # pdf
+                pptx_path = await conn.fetchval(
+                    "SELECT pptx_path FROM pptx_app.jobs WHERE job_id = $1",
+                    job_id,
+                )
+                if not pptx_path:
+                    raise HTTPException(status_code=404, detail=f"Job {job_id} not found or has no PPTX")
+                path = str(Path(pptx_path).with_suffix(".pdf"))
+    except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail="Database unavailable")
+
+    if format == "pdf" and not Path(path).exists():
+        # Call exporter to convert pptx to pdf
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.post(
+                    "http://exporter:8004/export-pdf",
+                    json={"job_id": job_id, "pptx_path": pptx_path},
+                    timeout=aiohttp.ClientTimeout(total=130),
+                ) as resp:
+                    if resp.status != 200:
+                        err_text = await resp.text()
+                        logger.error(f"Exporter PDF conversion failed: {err_text}")
+                        raise HTTPException(status_code=500, detail="Failed to convert PPTX to PDF via Exporter")
+                    resp_data = await resp.json()
+                    path = resp_data["pdf_path"]
+            except Exception as e:
+                logger.error(f"Failed to communicate with exporter for PDF conversion: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to convert PPTX to PDF: {str(e)}")
+
+    if not path or not Path(path).exists():
+        raise HTTPException(status_code=404, detail=f"File not found for job {job_id}")
+
+    file_path = Path(path)
+    if format == "pptx":
+        media_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    elif format == "html":
+        media_type = "text/html"
+    else:  # pdf
+        media_type = "application/pdf"
+
+    return FileResponse(
+        path=str(file_path),
+        filename=file_path.name,
+        media_type=media_type,
+    )
+
+
+@app.get("/api/preview/{job_id}/html", tags=["Preview"])
+async def preview_html(job_id: str):
+    """
+    Serve the HTML presentation for live preview.
+    """
+    try:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
             path = await conn.fetchval(
-                f"SELECT {col} FROM pptx_app.jobs WHERE job_id = $1",
+                "SELECT html_path FROM pptx_app.jobs WHERE job_id = $1",
                 job_id,
             )
     except Exception as e:
         raise HTTPException(status_code=500, detail="Database unavailable")
 
     if not path or not Path(path).exists():
-        raise HTTPException(status_code=404, detail=f"File not found for job {job_id}")
+        raise HTTPException(status_code=404, detail=f"HTML presentation not found for job {job_id}")
 
-    file_path = Path(path)
-    media_type = (
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-        if format == "pptx" else "text/html"
-    )
-    return FileResponse(
-        path=str(file_path),
-        filename=file_path.name,
-        media_type=media_type,
-    )
+    return FileResponse(path=path, media_type="text/html")
+
+
+@app.get("/api/preview/{job_id}/assets/{path:path}", tags=["Preview"])
+async def preview_assets(job_id: str, path: str):
+    """
+    Serve HTML presentation assets (CSS, JS, fonts).
+    """
+    # Sanitize path to prevent directory traversal
+    base_assets_dir = (SHARED_DATA_DIR / "output" / job_id / "assets").resolve()
+    
+    # Resolve the requested asset path
+    asset_file = (base_assets_dir / path).resolve()
+    
+    # Check if the resolved path is within the base directory
+    if not str(asset_file).startswith(str(base_assets_dir)):
+        raise HTTPException(status_code=403, detail="Access denied")
+        
+    if not asset_file.exists() or not asset_file.is_file():
+        raise HTTPException(status_code=404, detail="Asset not found")
+        
+    # Auto-detect media type
+    media_type = None
+    if asset_file.suffix == ".css":
+        media_type = "text/css"
+    elif asset_file.suffix == ".js":
+        media_type = "application/javascript"
+    elif asset_file.suffix in (".woff", ".woff2"):
+        media_type = "font/woff2" if asset_file.suffix == ".woff2" else "font/woff"
+    elif asset_file.suffix in (".png", ".jpg", ".jpeg"):
+        media_type = f"image/{asset_file.suffix[1:]}"
+        
+    return FileResponse(path=str(asset_file), media_type=media_type)
 
 
 @app.api_route("/api/thumbnails/{job_id}/{slide_num}", methods=["GET", "HEAD"], tags=["Thumbnails"])
