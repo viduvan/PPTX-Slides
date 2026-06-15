@@ -110,6 +110,7 @@ services:
       - shared_data:/data
       - ./frontend:/app/frontend:ro
       - ./html-assets:/app/html-assets:ro
+      - ./assets/thumbnails:/app/assets/thumbnails:ro
     networks:
       - pptx-slides-network
     depends_on:
