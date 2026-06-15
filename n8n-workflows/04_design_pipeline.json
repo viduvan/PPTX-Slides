@@ -115,7 +115,7 @@
     {
       "parameters": {
         "promptType": "define",
-        "text": "={{ 'Cho presentation về chủ đề: ' + ($json.context?.topic || 'general') + '\\nChọn 1 theme phù hợp nhất từ danh sách: midnight, ocean, forest, sunset, crimson, emerald_gold, rose, dark_purple, corporate_blue, cyber_punk, pastel_dream, aurora, volcano, arctic, desert_sand, lavender, neon_city, bamboo_zen, royal_gold, slate_minimal\\n\\nTrả về JSON: {\"theme\": \"theme_name\", \"reason\": \"lý do\"}' }}",
+        "text": "={{ 'Cho presentation về chủ đề: ' + ($json.context?.topic || 'general') + '\\nChọn 1 theme phù hợp nhất từ danh sách: tokyo-night, aurora, corporate-clean, cyberpunk-neon, dracula, minimal-white, catppuccin-mocha, nord, soft-pastel, solarized-light, gruvbox-dark, rose-pine, swiss-grid, pitch-deck-vc, editorial-serif, sharp-mono, academic-paper, blueprint, engineering-whiteprint, news-broadcast, retro-tv, magazine-bold, glassmorphism, xiaohongshu-white, memphis-pop, vaporwave, rainbow-gradient, midcentury, neo-brutalism, y2k-chrome, bauhaus, japanese-minimal, arctic-cool, sunset-warm, catppuccin-latte, terminal-green\\n\\nTrả về JSON: {\"theme\": \"theme_name\", \"reason\": \"lý do\"}' }}",
         "options": {}
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
@@ -153,7 +153,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Use user-selected theme\nreturn [{ json: { ...($input.first().json), selected_theme: $json.context?.theme_suggestion || 'midnight' } }];"
+        "jsCode": "// Use user-selected theme\nreturn [{ json: { ...($input.first().json), selected_theme: $json.context?.theme_suggestion || 'tokyo-night' } }];"
       },
       "id": "use-user-theme",
       "name": "Use User Theme",
@@ -188,7 +188,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Combine layouts + theme + images → visual_specs\nconst images = $input.first().json;\nlet theme = 'midnight';\ntry {\n  theme = $('Use User Theme').first().json.selected_theme;\n} catch (e) {\n  try {\n    let llmOut = $('LLM: Select Theme').first().json.output || '{}';\n    llmOut = llmOut.replace(/<think>[\\s\\S]*?<\\/think>/g, \"\").trim();\n    const parsed = JSON.parse(llmOut.replace(/```json\\n?|```/g, \"\"));\n    theme = parsed.theme || 'midnight';\n  } catch (e2) {\n    theme = 'midnight';\n  }\n}\n\nreturn [{\n  json: {\n    job_id: $('Start').first().json.job_id,\n    slides: $('Start').first().json.slides,\n    output_format: $('Start').first().json.output_format,\n    visual_specs: {\n      theme: theme,\n      layouts: $('Parse Layouts').first().json.layouts,\n      images: images.image_paths || {}\n    }\n  }\n}];"
+        "jsCode": "// Combine layouts + theme + images → visual_specs\nconst images = $input.first().json;\nlet theme = 'tokyo-night';\ntry {\n  theme = $('Use User Theme').first().json.selected_theme;\n} catch (e) {\n  try {\n    let llmOut = $('LLM: Select Theme').first().json.output || '{}';\n    llmOut = llmOut.replace(/<think>[\\s\\S]*?<\\/think>/g, \"\").trim();\n    const parsed = JSON.parse(llmOut.replace(/```json\\n?|```/g, \"\"));\n    theme = parsed.theme || 'tokyo-night';\n  } catch (e2) {\n    theme = 'tokyo-night';\n  }\n}\n\nreturn [{\n  json: {\n    job_id: $('Start').first().json.job_id,\n    slides: $('Start').first().json.slides,\n    output_format: $('Start').first().json.output_format,\n    visual_specs: {\n      theme: theme,\n      layouts: $('Parse Layouts').first().json.layouts,\n      images: images.image_paths || {}\n    }\n  }\n}];"
       },
       "id": "merge-specs",
       "name": "Merge Visual Specs",
