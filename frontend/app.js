@@ -942,8 +942,9 @@ async function loadThemes() {
 
         const data = await res.json();
         const container = dom.themeSelector;
+        container.innerHTML = ''; // Clear container
 
-        // Build category tabs
+        // Build category tabs for PPTX static themes
         const tabBar = document.createElement('div');
         tabBar.className = 'theme-tabs';
 
@@ -1019,10 +1020,90 @@ async function loadThemes() {
         container.appendChild(tabsWrapper);
         container.appendChild(tabContent);
 
+        // Build HTML themes section (Dynamic live dynamic preview)
+        if (data.html_themes && data.html_themes.length > 0) {
+            const divider = document.createElement('div');
+            divider.className = 'theme-section-divider';
+            divider.innerHTML = `
+                <span class="theme-section-divider__icon">🌐</span>
+                <span class="theme-section-divider__text">${currentLang === 'vi' ? 'Mẫu HTML (động)' : 'HTML Themes (animated)'}</span>
+            `;
+            container.appendChild(divider);
+            
+            const htmlTabBar = document.createElement('div');
+            htmlTabBar.className = 'theme-tabs';
+            
+            const htmlTabContent = document.createElement('div');
+            htmlTabContent.className = 'theme-tabs__content';
+            
+            data.html_themes.forEach((cat, idx) => {
+                // Tab button
+                const tab = document.createElement('button');
+                tab.className = 'theme-tab' + (idx === 0 ? ' active' : '');
+                tab.dataset.category = `html-${cat.id}`;
+                const label = currentLang === 'vi' ? (cat.label_vi || cat.label) : cat.label;
+                tab.innerHTML = `<span>${cat.emoji}</span> <span class="theme-tab__label">${label}</span>`;
+                tab.addEventListener('click', () => {
+                    htmlTabBar.querySelectorAll('.theme-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    htmlTabContent.querySelectorAll('.theme-category').forEach(p => p.hidden = true);
+                    htmlTabContent.querySelector(`[data-cat="html-${cat.id}"]`).hidden = false;
+                });
+                htmlTabBar.appendChild(tab);
+                
+                // Theme grid
+                const panel = document.createElement('div');
+                panel.className = 'theme-category';
+                panel.dataset.cat = `html-${cat.id}`;
+                panel.hidden = idx !== 0;
+                
+                cat.themes.forEach(theme => {
+                    const btn = document.createElement('button');
+                    btn.className = 'theme-option theme-option--html';
+                    btn.dataset.theme = theme.id;
+                    btn.title = theme.label;
+                    btn.innerHTML = `
+                        <span class="theme-option__color" style="background: linear-gradient(135deg, ${theme.accent}, ${theme.bg});">${cat.emoji}</span>
+                        <span class="theme-option__label">${theme.label}</span>
+                        <span class="theme-option__badge">HTML</span>
+                        <button class="theme-option__preview" title="${currentLang === 'vi' ? 'Xem thử động' : 'Live Preview'}" data-html-preview="${theme.id}">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <polygon points="5 3 19 12 5 21 5 3"/>
+                            </svg>
+                        </button>
+                    `;
+                    panel.appendChild(btn);
+                });
+                
+                htmlTabContent.appendChild(panel);
+            });
+            
+            const htmlTabsWrapper = document.createElement('div');
+            htmlTabsWrapper.className = 'theme-tabs-wrapper';
+            htmlTabsWrapper.appendChild(htmlTabBar);
+            
+            htmlTabBar.addEventListener('scroll', () => {
+                const { scrollLeft, scrollWidth, clientWidth } = htmlTabBar;
+                htmlTabsWrapper.classList.toggle('scrolled-start', scrollLeft > 4);
+                htmlTabsWrapper.classList.toggle('scrolled-end', scrollLeft + clientWidth >= scrollWidth - 4);
+            });
+            
+            container.appendChild(htmlTabsWrapper);
+            container.appendChild(htmlTabContent);
+        }
+
         // Click handlers for all theme buttons
         container.addEventListener('click', (e) => {
+            // HTML preview play button clicked
+            const htmlPreviewBtn = e.target.closest('.theme-option__preview[data-html-preview]');
+            if (htmlPreviewBtn) {
+                e.stopPropagation();
+                showHtmlThemePreview(htmlPreviewBtn.dataset.htmlPreview);
+                return;
+            }
+            
             // Preview eye button clicked
-            const previewBtn = e.target.closest('.theme-option__preview');
+            const previewBtn = e.target.closest('.theme-option__preview[data-preview]');
             if (previewBtn) {
                 e.stopPropagation();
                 showThemePreview(previewBtn.dataset.preview);
@@ -1065,6 +1146,14 @@ async function showThemePreview(themeId) {
         if (!res.ok) throw new Error('Preview fetch failed');
 
         const data = await res.json();
+        
+        // If API returns HTML type, delegate to HTML preview handler
+        if (data.type === 'html') {
+            showHtmlThemePreview(data.theme_id);
+            setStatus(t('status.ready'), 'ready');
+            return;
+        }
+
         state.previewThemeId = data.theme_id;
 
         // Populate header
@@ -1102,6 +1191,52 @@ async function showThemePreview(themeId) {
         setStatus(t('status.error'), 'error');
         showToast(`Preview error: ${err.message}`, 'error');
         setTimeout(() => setStatus(t('status.ready'), 'ready'), 3000);
+    }
+}
+
+function showHtmlThemePreview(themeId) {
+    state.previewThemeId = themeId;
+
+    // Populate header
+    dom.previewEmoji.textContent = '🌐';
+    const label = themeId.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    dom.previewName.textContent = label;
+    dom.previewCategory.textContent = currentLang === 'vi' ? 'Mẫu HTML động' : 'HTML Theme (animated)';
+
+    // Replace slide grid with iframe
+    dom.previewSlides.innerHTML = '';
+
+    const iframeContainer = document.createElement('div');
+    iframeContainer.className = 'preview-iframe-container';
+    iframeContainer.innerHTML = `
+        <iframe 
+            src="${API_BASE}/api/html-theme-preview/${themeId}" 
+            class="preview-iframe"
+            frameborder="0"
+            allow="fullscreen"
+        ></iframe>
+        <div class="preview-iframe-hint">
+            <span>← → ${currentLang === 'vi' ? 'Di chuyển' : 'Navigate'}</span>
+            <span>T ${currentLang === 'vi' ? 'Đổi theme' : 'Cycle themes'}</span>
+            <span>A ${currentLang === 'vi' ? 'Hiệu ứng' : 'Animations'}</span>
+            <span>F ${currentLang === 'vi' ? 'Toàn màn hình' : 'Fullscreen'}</span>
+        </div>
+    `;
+    dom.previewSlides.appendChild(iframeContainer);
+
+    // Show preview panel
+    dom.emptyState.hidden = true;
+    dom.loadingState.hidden = true;
+    dom.slidesArea.hidden = true;
+    dom.themePreview.hidden = false;
+
+    // Focus the iframe automatically for immediate keyboard usage
+    const iframe = iframeContainer.querySelector('iframe');
+    if (iframe) {
+        iframe.focus();
+        iframe.onload = () => {
+            iframe.contentWindow.focus();
+        };
     }
 }
 
