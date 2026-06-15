@@ -14,6 +14,7 @@ Developed by ChimSe (viduvan) - https://github.com/viduvan
 """
 import logging
 import os
+import re
 import uuid
 from pathlib import Path
 
@@ -33,6 +34,8 @@ N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "http://n8n:5678/webhook")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://pptx:pptx@postgres:5432/pptx_slides")
 SHARED_DATA_DIR = Path(os.getenv("SHARED_DATA_DIR", "/data"))
 FRONTEND_DIR = Path(os.getenv("FRONTEND_DIR", "/app/frontend"))
+THUMBNAILS_ASSETS_DIR = Path("/app/assets/thumbnails")
+HTML_ASSETS_DIR = Path(os.getenv("HTML_ASSETS_DIR", "/app/html-assets"))
 
 # ── App ──────────────────────────────────────────────────────
 app = FastAPI(
@@ -220,11 +223,37 @@ async def generate_slides(req: GenerateRequest):
         # Continue even if DB fails — n8n will create its own tracking
 
     # Trigger n8n webhook asynchronously
+    theme = req.theme
+    PPTX_TO_HTML_THEME_MAP = {
+        "corporate_blue":  "corporate-clean",
+        "executive_gray":  "editorial-serif",
+        "finance_green":   "swiss-grid",
+        "legal_navy":      "pitch-deck-vc",
+        "consulting_teal": "bauhaus",
+        "bold_orange":     "sunset-warm",
+        "artistic_purple": "memphis-pop",
+        "neon_pop":        "aurora",
+        "retro_vintage":   "midcentury",
+        "rose_pink":       "soft-pastel",
+        "scholar_blue":    "blueprint",
+        "campus_green":    "academic-paper",
+        "library_brown":   "japanese-minimal",
+        "science_teal":    "engineering-whiteprint",
+        "chalkboard":      "gruvbox-dark",
+        "cyber_punk":      "cyberpunk-neon",
+        "matrix_green":    "terminal-green",
+        "ai_blue":         "tokyo-night",
+        "quantum_violet":  "dracula",
+        "data_orange":     "catppuccin-mocha",
+    }
+    if theme in PPTX_TO_HTML_THEME_MAP:
+        theme = PPTX_TO_HTML_THEME_MAP[theme]
+
     payload = {
         "job_id": job_id,
         "prompt": req.prompt,
         "document_text": req.word_content,
-        "theme": req.theme,
+        "theme": theme,
         "output_format": req.output_format,
     }
 
@@ -456,6 +485,239 @@ async def get_thumbnail(job_id: str, slide_num: int):
     return FileResponse(path=str(thumb_path), media_type="image/png")
 
 
+# Cached registry to avoid reading files on every request
+_html_registry = None
+_html_category_map = None
+
+
+def get_html_theme_registry():
+    global _html_registry, _html_category_map
+    if _html_registry is None:
+        _html_registry, _html_category_map = _build_html_theme_registry()
+    return _html_registry, _html_category_map
+
+
+def _extract_css_var(css_text, var_name):
+    """Extract CSS variable value from :root block. E.g. --bg:#1a1b26"""
+    pattern = rf'{re.escape(var_name)}\s*:\s*([^;}}]+)'
+    match = re.search(pattern, css_text)
+    return match.group(1).strip() if match else None
+
+
+def _build_html_theme_registry():
+    """Parse accent/bg colors from 36 theme CSS files, auto-categorize."""
+    themes_dir = HTML_ASSETS_DIR / "themes"
+    if not themes_dir.exists():
+        logger.warning(f"HTML themes directory not found at {themes_dir}")
+        return {}, {}
+
+    CATEGORY_MAP = {
+        "dark_modern": {
+            "themes": ["tokyo-night", "dracula", "catppuccin-mocha", "gruvbox-dark", "nord", "rose-pine"],
+            "label": "Dark Modern", "label_vi": "Tối hiện đại", "emoji": "🌙", "order": 1
+        },
+        "creative": {
+            "themes": ["aurora", "memphis-pop", "vaporwave", "rainbow-gradient", "midcentury", 
+                       "neo-brutalism", "y2k-chrome", "soft-pastel"],
+            "label": "Creative", "label_vi": "Sáng tạo", "emoji": "🎨", "order": 2
+        },
+        "business": {
+            "themes": ["corporate-clean", "pitch-deck-vc", "swiss-grid", "editorial-serif", "sharp-mono"],
+            "label": "Business", "label_vi": "Doanh nghiệp", "emoji": "💼", "order": 3
+        },
+        "education": {
+            "themes": ["academic-paper", "blueprint", "engineering-whiteprint"],
+            "label": "Education", "label_vi": "Giáo dục", "emoji": "📚", "order": 4
+        },
+        "media": {
+            "themes": ["news-broadcast", "retro-tv", "magazine-bold", "glassmorphism", "xiaohongshu-white"],
+            "label": "Media", "label_vi": "Truyền thông", "emoji": "📺", "order": 5
+        },
+        "light_minimal": {
+            "themes": ["minimal-white", "solarized-light", "catppuccin-latte", "bauhaus", 
+                       "japanese-minimal", "arctic-cool", "sunset-warm"],
+            "label": "Light & Minimal", "label_vi": "Sáng & Tối giản", "emoji": "☀️", "order": 6
+        },
+        "tech_cyber": {
+            "themes": ["cyberpunk-neon", "terminal-green"],
+            "label": "Tech & Cyber", "label_vi": "Công nghệ", "emoji": "🤖", "order": 7
+        },
+    }
+
+    registry = {}
+    for css_file in themes_dir.glob("*.css"):
+        theme_id = css_file.stem  # e.g. "tokyo-night"
+        try:
+            content = css_file.read_text(encoding="utf-8")
+            bg = _extract_css_var(content, "--bg")
+            accent = _extract_css_var(content, "--accent")
+        except Exception as e:
+            logger.error(f"Failed to read CSS file {css_file}: {e}")
+            bg, accent = None, None
+
+        # Find category
+        category = "creative"  # default fallback
+        for cat_id, cat_info in CATEGORY_MAP.items():
+            if theme_id in cat_info["themes"]:
+                category = cat_id
+                break
+
+        registry[theme_id] = {
+            "bg": bg or "#1a1b26",
+            "accent": accent or "#7aa2f7",
+            "category": category,
+        }
+
+    return registry, CATEGORY_MAP
+
+
+@app.get("/api/theme-thumbnails/{theme_id}/{slide_num}", tags=["Themes"])
+async def serve_theme_thumbnail(theme_id: str, slide_num: int):
+    """Serve PNG thumbnail for PPTX theme preview (20 old templates)."""
+    if not re.match(r"^[a-z0-9_]+$", theme_id):
+        raise HTTPException(status_code=400, detail="Invalid theme_id")
+    if slide_num not in (1, 2, 3):
+        raise HTTPException(status_code=400, detail="Invalid slide number")
+    
+    file_path = THUMBNAILS_ASSETS_DIR / f"{theme_id}_slide_{slide_num}.png"
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Thumbnail not found")
+    return FileResponse(file_path, media_type="image/png")
+
+
+@app.get("/api/html-theme-preview/{theme_id}", tags=["Themes"])
+async def html_theme_preview(theme_id: str):
+    """
+    Render self-contained HTML page for live theme preview.
+    """
+    if not re.match(r"^[a-z0-9-]+$", theme_id):
+        raise HTTPException(status_code=400, detail="Invalid theme_id")
+
+    theme_css_path = HTML_ASSETS_DIR / "themes" / f"{theme_id}.css"
+    if not theme_css_path.exists():
+        raise HTTPException(status_code=404, detail=f"Theme '{theme_id}' not found")
+    
+    try:
+        base_css = (HTML_ASSETS_DIR / "base.css").read_text(encoding="utf-8")
+        fonts_css = (HTML_ASSETS_DIR / "fonts.css").read_text(encoding="utf-8")
+        theme_css = theme_css_path.read_text(encoding="utf-8")
+        anim_css = (HTML_ASSETS_DIR / "animations" / "animations.css").read_text(encoding="utf-8")
+        runtime_js = (HTML_ASSETS_DIR / "runtime.js").read_text(encoding="utf-8")
+    except Exception as e:
+        logger.error(f"Failed to read asset files: {e}")
+        raise HTTPException(status_code=500, detail="Error loading preview assets")
+    
+    # Build list of all available themes for the T key cycling
+    themes_dir = HTML_ASSETS_DIR / "themes"
+    all_themes = sorted([f.stem for f in themes_dir.glob("*.css")])
+    theme_cycle = ",".join(all_themes)
+    
+    # Theme base path for CSS updates when cycling themes via T key
+    theme_base_url = "/api/html-assets/themes/"
+    
+    html = f"""<!DOCTYPE html>
+<html lang="en" data-theme="{theme_id}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Preview — {theme_id}</title>
+<style>{fonts_css}</style>
+<style>{base_css}</style>
+<style id="theme-css">{theme_css}</style>
+<style>{anim_css}</style>
+</head>
+<body>
+<div class="deck" data-themes="{theme_cycle}" data-theme-base="{theme_base_url}">
+
+  <section class="slide is-active" data-title="Cover">
+    <div class="deck-header"><span class="eyebrow">Keynote · 2026</span></div>
+    <div class="anim-stagger-list">
+      <p class="kicker">PPTX-Slides · AI Presentation</p>
+      <h1 class="h1 anim-fade-up" data-anim="fade-up">
+        Build <span class="gradient-text">stunning</span><br>presentations with AI
+      </h1>
+      <p class="lede">From document to beautiful slides in seconds.</p>
+      <div class="row wrap mt-l">
+        <span class="pill pill-accent">36 themes</span>
+        <span class="pill">31 layouts</span>
+        <span class="pill">27 animations</span>
+      </div>
+    </div>
+    <div class="deck-footer"><span class="dim2">PPTX-Slides</span><span class="slide-number" data-current="1" data-total="5"></span></div>
+  </section>
+
+  <section class="slide" data-title="Key Features">
+    <div class="deck-header"><span class="eyebrow">Features · Overview</span></div>
+    <div>
+      <h2 class="h2">What makes this different</h2>
+      <p class="lede mb-l">Three pillars of our design system</p>
+      <ul class="grid g3 anim-stagger-list" style="list-style:none;padding:0;margin:0;gap:14px" data-anim-target>
+        <li class="card card-accent"><h4>① Consistent design tokens</h4><p class="dim">Colors, typography, and spacing follow a unified system.</p></li>
+        <li class="card card-accent"><h4>② Theme switching</h4><p class="dim">Press T to cycle themes — works across 36 built-in themes.</p></li>
+        <li class="card card-accent"><h4>③ Rich animations</h4><p class="dim">27 CSS animations from fade to 3D cube — all GPU-accelerated.</p></li>
+      </ul>
+    </div>
+    <div class="deck-footer"><span class="dim2">PPTX-Slides</span><span class="slide-number" data-current="2" data-total="5"></span></div>
+  </section>
+
+  <section class="slide" data-title="KPIs">
+    <div class="deck-header"><span class="eyebrow">Metrics · Dashboard</span></div>
+    <div>
+      <h2 class="h2">Performance at a glance</h2>
+      <div class="grid g4 mt-l anim-stagger-list" data-anim-target>
+        <div class="card"><p class="eyebrow">Themes</p><div style="font-size:56px;font-weight:800"><span class="counter" data-to="36">0</span></div><p class="dim" style="color:var(--good)">Built-in</p></div>
+        <div class="card"><p class="eyebrow">Layouts</p><div style="font-size:56px;font-weight:800"><span class="counter" data-to="31">0</span></div><p class="dim" style="color:var(--good)">Templates</p></div>
+        <div class="card"><p class="eyebrow">Animations</p><div style="font-size:56px;font-weight:800"><span class="counter" data-to="27">0</span></div><p class="dim" style="color:var(--accent)">Effects</p></div>
+        <div class="card"><p class="eyebrow">Build time</p><div style="font-size:56px;font-weight:800"><span class="counter" data-to="0">0</span>s</div><p class="dim" style="color:var(--good)">Zero build</p></div>
+      </div>
+    </div>
+    <div class="deck-footer"><span class="dim2">PPTX-Slides</span><span class="slide-number" data-current="3" data-total="5"></span></div>
+  </section>
+
+  <section class="slide" data-title="Roadmap">
+    <div class="deck-header"><span class="eyebrow">Timeline · Milestones</span></div>
+    <div>
+      <h2 class="h2">Development journey</h2>
+      <div class="grid g3 mt-l anim-stagger-list" data-anim-target>
+        <div class="card"><h4>Q1 · Foundation</h4><p class="dim">Base CSS, typography system, 8 themes</p></div>
+        <div class="card"><h4>Q2 · Expansion</h4><p class="dim">36 themes, 31 layouts, animation engine</p></div>
+        <div class="card"><h4>Q3 · Integration</h4><p class="dim">AI pipeline, PPTX export, live preview</p></div>
+      </div>
+    </div>
+    <div class="deck-footer"><span class="dim2">PPTX-Slides</span><span class="slide-number" data-current="4" data-total="5"></span></div>
+  </section>
+
+  <section class="slide tc center" data-title="Thanks">
+    <div>
+      <div class="anim-confetti-burst" style="display:inline-block;padding:40px"></div>
+      <h1 class="h1 anim-fade-up" data-anim="fade-up" style="font-size:100px;line-height:1"><span class="gradient-text">Thanks</span></h1>
+      <p class="lede" style="margin:18px auto 0">Press T to cycle themes · A for animations · ← → to navigate</p>
+    </div>
+    <div class="deck-footer"><span class="dim2">PPTX-Slides</span><span class="slide-number" data-current="5" data-total="5"></span></div>
+  </section>
+
+</div>
+<script>{runtime_js}</script>
+</body></html>"""
+    return HTMLResponse(content=html)
+
+
+@app.get("/api/html-assets/themes/{filename}", tags=["Themes"])
+async def serve_theme_css(filename: str):
+    """Serve theme CSS file for T key switching in iframe preview."""
+    if not filename.endswith(".css"):
+        raise HTTPException(status_code=400, detail="Only CSS files are allowed")
+    
+    theme_id = filename[:-4]
+    if not re.match(r"^[a-z0-9-]+$", theme_id):
+        raise HTTPException(status_code=400, detail="Invalid filename format")
+        
+    file_path = HTML_ASSETS_DIR / "themes" / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Theme CSS not found")
+    return FileResponse(file_path, media_type="text/css")
+
+
 @app.get("/api/themes", tags=["Themes"])
 async def list_themes():
     """
@@ -516,7 +778,36 @@ async def list_themes():
             "themes": cat_themes
         })
 
-    return {"categories": categories, "default": "corporate_blue"}
+    # Bổ sung 36 HTML themes
+    html_registry, category_map = get_html_theme_registry()
+    
+    html_categories = []
+    for cat_id, cat_info in sorted(category_map.items(), key=lambda x: x[1]["order"]):
+        cat_themes = []
+        for theme_id, reg in html_registry.items():
+            if reg["category"] != cat_id:
+                continue
+            cat_themes.append({
+                "id": theme_id,
+                "label": theme_id.replace("-", " ").title(),
+                "accent": reg["accent"],
+                "bg": reg["bg"],
+                "preview_url": f"/api/html-theme-preview/{theme_id}"
+            })
+        if cat_themes:
+            html_categories.append({
+                "id": cat_id,
+                "label": cat_info["label"],
+                "label_vi": cat_info["label_vi"],
+                "emoji": cat_info["emoji"],
+                "themes": cat_themes
+            })
+
+    return {
+        "categories": categories,
+        "html_themes": html_categories,
+        "default": "corporate_blue"
+    }
 
 
 @app.get("/api/slides/themes", tags=["Themes"])
@@ -529,9 +820,17 @@ async def list_slides_themes():
 async def get_theme_preview(theme_id: str):
     """
     Return theme metadata and preview slide thumbnails.
-    Generates inline SVG slide thumbnails encoded in Base64 for offline compatibility.
     """
     import base64
+    
+    # Check if this theme belongs to HTML themes
+    html_registry, _ = get_html_theme_registry()
+    if theme_id in html_registry:
+        return {
+            "theme_id": theme_id,
+            "type": "html",
+            "preview_url": f"/api/html-theme-preview/{theme_id}",
+        }
     
     theme_registry = {
         "corporate_blue":  {"category": "business",   "label": "Corporate Blue",  "label_vi": "Xanh doanh nghiệp",  "emoji": "💼", "category_label": "Business", "category_label_vi": "Doanh nghiệp"},
@@ -563,23 +862,28 @@ async def get_theme_preview(theme_id: str):
         theme_id, {"label": theme_id.title(), "label_vi": theme_id.title(), "emoji": "🎨", "category_label": "Modern", "category_label_vi": "Hiện đại"}
     )
     
-    # Generate 3 beautiful mock SVG slides in base64 format
+    # Generate 3 slide previews (use real PNG thumbnails if available, fallback to mock SVG)
     slides = []
     for i in range(1, 4):
-        svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
-            <rect width="800" height="450" fill="#1e1e2e" rx="10"/>
-            <circle cx="400" cy="225" r="150" fill="#313244" opacity="0.5"/>
-            <rect x="50" y="50" width="700" height="350" fill="none" stroke="#45475a" stroke-width="2" rx="5"/>
-            <text x="400" y="200" fill="#cdd6f4" font-family="system-ui, sans-serif" font-size="32" font-weight="bold" text-anchor="middle">
-                {theme_id.upper()}
-            </text>
-            <text x="400" y="260" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="20" text-anchor="middle">
-                Slide {i} Preview
-            </text>
-            <rect x="350" y="300" width="100" height="4" fill="#f38ba8" rx="2"/>
-        </svg>"""
-        b64_svg = base64.b64encode(svg.encode('utf-8')).decode('utf-8')
-        image_url = f"data:image/svg+xml;base64,{b64_svg}"
+        thumb_path = THUMBNAILS_ASSETS_DIR / f"{theme_id}_slide_{i}.png"
+        if thumb_path.exists():
+            image_url = f"/api/theme-thumbnails/{theme_id}/{i}"
+        else:
+            svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
+                <rect width="800" height="450" fill="#1e1e2e" rx="10"/>
+                <circle cx="400" cy="225" r="150" fill="#313244" opacity="0.5"/>
+                <rect x="50" y="50" width="700" height="350" fill="none" stroke="#45475a" stroke-width="2" rx="5"/>
+                <text x="400" y="200" fill="#cdd6f4" font-family="system-ui, sans-serif" font-size="32" font-weight="bold" text-anchor="middle">
+                    {theme_id.upper()}
+                </text>
+                <text x="400" y="260" fill="#a6adc8" font-family="system-ui, sans-serif" font-size="20" text-anchor="middle">
+                    Slide {i} Preview
+                </text>
+                <rect x="350" y="300" width="100" height="4" fill="#f38ba8" rx="2"/>
+            </svg>"""
+            b64_svg = base64.b64encode(svg.encode('utf-8')).decode('utf-8')
+            image_url = f"data:image/svg+xml;base64,{b64_svg}"
+            
         slides.append({
             "slide_number": i,
             "image_url": image_url
@@ -587,6 +891,7 @@ async def get_theme_preview(theme_id: str):
         
     return {
         "theme_id": theme_id,
+        "type": "pptx",
         "label": reg["label"],
         "label_vi": reg["label_vi"],
         "emoji": reg["emoji"],
